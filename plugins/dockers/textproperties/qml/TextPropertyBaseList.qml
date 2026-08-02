@@ -155,6 +155,8 @@ ColumnLayout {
             id: propertiesWidgetView
 
             anchors.fill: parent;
+            // Keep regular scrolling, but do not continue moving after the drag ends.
+            maximumFlickVelocity: 0;
             ScrollBar.vertical: ScrollBar {
             }
 
