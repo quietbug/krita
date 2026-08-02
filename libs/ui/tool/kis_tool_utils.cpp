@@ -267,7 +267,7 @@ namespace KisToolUtils {
         , updateColor(true)
         , addColorToCurrentPalette(false)
         , normaliseValues(false)
-        , sampleMerged(true)
+        , sampleSource(ColorSamplerSource::MergedImage)
         , radius(1)
         , blend(100)
     {
@@ -280,7 +280,7 @@ namespace KisToolUtils {
         props.setProperty("updateColor", updateColor);
         props.setProperty("addPalette", addColorToCurrentPalette);
         props.setProperty("normaliseValues", normaliseValues);
-        props.setProperty("sampleMerged", sampleMerged);
+        props.setProperty("sampleSource", static_cast<int>(sampleSource));
         props.setProperty("radius", radius);
         props.setProperty("blend", blend);
 
@@ -300,7 +300,17 @@ namespace KisToolUtils {
         updateColor = props.getBool("updateColor", true);
         addColorToCurrentPalette = props.getBool("addPalette", false);
         normaliseValues = props.getBool("normaliseValues", false);
-        sampleMerged = props.getBool("sampleMerged", true);
+        if (props.hasProperty("sampleSource")) {
+            const int value = props.getInt("sampleSource", static_cast<int>(ColorSamplerSource::MergedImage));
+            sampleSource = value == static_cast<int>(ColorSamplerSource::CurrentLayer) ?
+                ColorSamplerSource::CurrentLayer :
+                value == static_cast<int>(ColorSamplerSource::CurrentLayerAndBelow) ?
+                    ColorSamplerSource::CurrentLayerAndBelow :
+                    ColorSamplerSource::MergedImage;
+        } else {
+            sampleSource = props.getBool("sampleMerged", true) ?
+                ColorSamplerSource::MergedImage : ColorSamplerSource::CurrentLayer;
+        }
         radius = props.getInt("radius", 1);
         blend = props.getInt("blend", 100);
     }

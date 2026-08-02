@@ -290,7 +290,10 @@ void KisToolPaint::activateAlternateAction(AlternateAction action)
 
     const bool sampleCurrentLayer = action == SampleFgNode || action == SampleBgNode;
     const bool sampleFgColor = action == SampleFgNode || action == SampleFgImage;
-    m_colorSamplerHelper.activate(sampleCurrentLayer, sampleFgColor);
+    const KisToolUtils::ColorSamplerSource sampleSource = sampleCurrentLayer ?
+        KisToolUtils::ColorSamplerSource::CurrentLayer :
+        KisToolUtils::ColorSamplerSource::MergedImage;
+    m_colorSamplerHelper.activate(sampleSource, sampleFgColor);
 }
 
 void KisToolPaint::deactivateAlternateAction(AlternateAction action)
@@ -754,4 +757,3 @@ KisOptimizedBrushOutline KisToolPaint::getOutlinePath(const QPointF &documentPos
 
     return path;
 }
-

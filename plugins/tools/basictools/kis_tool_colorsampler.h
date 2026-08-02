@@ -50,7 +50,7 @@ public:
         bool updateColor;
         bool addPalette;
         bool normaliseValues;
-        bool sampleMerged;
+        KisToolUtils::ColorSamplerSource sampleSource;
         int radius;
         int blend;
 

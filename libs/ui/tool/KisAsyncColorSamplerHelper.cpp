@@ -13,6 +13,7 @@
 #include <QPalette>
 #include <QPixmap>
 #include <QTransform>
+#include <QVector>
 
 #include "KoCanvasResourcesIds.h"
 #include "KoCanvasResourceProvider.h"
@@ -22,6 +23,12 @@
 #include "kis_signal_compressor_with_param.h"
 #include "kis_image_interfaces.h"
 #include "kis_canvas2.h"
+#include "kis_default_bounds.h"
+#include "kis_abstract_projection_plane.h"
+#include "kis_node.h"
+#include "kis_paint_device.h"
+#include "kis_painter.h"
+#include "kis_projection_leaf.h"
 #include "KisViewManager.h"
 #include "KisDocument.h"
 #include "KisReferenceImagesLayer.h"
@@ -49,7 +56,8 @@ struct KisAsyncColorSamplerHelper::Private
     KisCanvas2 *canvas;
 
     int sampleResourceId {0};
-    bool sampleCurrentLayer {true};
+    KisToolUtils::ColorSamplerSource sampleSource {KisToolUtils::ColorSamplerSource::CurrentLayer};
+    int sampleRadius {1};
     bool updateGlobalColor {true};
 
     bool isActive {false};
@@ -192,7 +200,7 @@ bool KisAsyncColorSamplerHelper::isActive() const
     return m_d->isActive;
 }
 
-void KisAsyncColorSamplerHelper::activate(bool sampleCurrentLayer, bool pickFgColor)
+void KisAsyncColorSamplerHelper::activate(KisToolUtils::ColorSamplerSource sampleSource, bool pickFgColor)
 {
     KIS_SAFE_ASSERT_RECOVER_RETURN(!m_d->isActive);
     m_d->isActive = true;
@@ -202,7 +210,7 @@ void KisAsyncColorSamplerHelper::activate(bool sampleCurrentLayer, bool pickFgCo
             KoCanvasResource::ForegroundColor :
             KoCanvasResource::BackgroundColor;
 
-    m_d->sampleCurrentLayer = sampleCurrentLayer;
+    m_d->sampleSource = sampleSource;
     m_d->haveSample = false;
 
 
@@ -243,10 +251,10 @@ void KisAsyncColorSamplerHelper::activatePreview()
     m_d->baseColor = previewColor;
     m_d->cache = QPixmap();
 
-    updateCursor(m_d->sampleCurrentLayer, m_d->sampleResourceId == KoCanvasResource::ForegroundColor);
+    updateCursor(m_d->sampleSource, m_d->sampleResourceId == KoCanvasResource::ForegroundColor);
 }
 
-void KisAsyncColorSamplerHelper::updateCursor(bool sampleCurrentLayer, bool pickFgColor)
+void KisAsyncColorSamplerHelper::updateCursor(KisToolUtils::ColorSamplerSource sampleSource, bool pickFgColor)
 {
     const int sampleResourceId =
             pickFgColor ?
@@ -255,7 +263,7 @@ void KisAsyncColorSamplerHelper::updateCursor(bool sampleCurrentLayer, bool pick
 
     QCursor cursor;
 
-    if (sampleCurrentLayer) {
+    if (sampleSource != KisToolUtils::ColorSamplerSource::MergedImage) {
         if (sampleResourceId == KoCanvasResource::ForegroundColor) {
             cursor = KisCursor::samplerLayerForegroundCursor();
         } else {
@@ -312,6 +320,7 @@ void KisAsyncColorSamplerHelper::startAction(const QPointF &docPoint, int radius
     connect(strategy, &KisColorSamplerStrokeStrategy::sigFinalColorSelected,
             this, &KisAsyncColorSamplerHelper::sigFinalColorSelected);
 
+    m_d->sampleRadius = radius;
     activatePreview();
     m_d->haveSample = true;
     m_d->strokeId = m_d->strokesFacade()->startStroke(strategy);
@@ -555,7 +564,7 @@ void KisAsyncColorSamplerHelper::slotAddSamplingJob(const QPointF &docPoint)
 
     const QPoint imagePoint = image->documentToImagePixelFloored(docPoint);
 
-    if (!m_d->sampleCurrentLayer) {
+    if (m_d->sampleSource == KisToolUtils::ColorSamplerSource::MergedImage) {
         KisSharedPtr<KisReferenceImagesLayer> referencesLayer = m_d->canvas->imageView()->document()->referenceImagesLayer();
         if (referencesLayer && m_d->canvas->referenceImagesDecoration()->visible()) {
             QColor color = referencesLayer->getPixel(imagePoint);
@@ -566,9 +575,43 @@ void KisAsyncColorSamplerHelper::slotAddSamplingJob(const QPointF &docPoint)
         }
     }
 
-    KisPaintDeviceSP device = m_d->sampleCurrentLayer ?
-        m_d->canvas->imageView()->currentNode()->colorSampleSourceDevice() :
-        image->projection();
+    KisPaintDeviceSP device;
+    switch (m_d->sampleSource) {
+    case KisToolUtils::ColorSamplerSource::MergedImage:
+        device = image->projection();
+        break;
+    case KisToolUtils::ColorSamplerSource::CurrentLayer:
+        device = m_d->canvas->imageView()->currentNode()->colorSampleSourceDevice();
+        break;
+    case KisToolUtils::ColorSamplerSource::CurrentLayerAndBelow: {
+        KisNodeSP currentNode = m_d->canvas->imageView()->currentNode();
+        KisProjectionLeafSP leaf = currentNode ? currentNode->projectionLeaf() : KisProjectionLeafSP();
+        if (!leaf) {
+            break;
+        }
+
+        const int effectiveRadius = qMax(1, m_d->sampleRadius) - 1;
+        const QRect sampleRect(imagePoint.x() - effectiveRadius,
+                               imagePoint.y() - effectiveRadius,
+                               2 * effectiveRadius + 1,
+                               2 * effectiveRadius + 1);
+        device = new KisPaintDevice(KisNodeWSP(), image->colorSpace(),
+                                    new KisDefaultBounds(image));
+
+        QVector<KisProjectionLeafSP> leaves;
+        for (; leaf; leaf = leaf->prevSibling()) {
+            leaves.prepend(leaf);
+        }
+
+        KisPainter painter(device);
+        for (const KisProjectionLeafSP &sampleLeaf : leaves) {
+            if (sampleLeaf->visible()) {
+                sampleLeaf->projectionPlane()->apply(&painter, sampleRect);
+            }
+        }
+        break;
+    }
+    }
 
     if (device) {
         // Used for color sampler blending.

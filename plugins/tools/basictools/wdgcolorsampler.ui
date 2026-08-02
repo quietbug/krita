@@ -130,7 +130,7 @@
       </size>
      </property>
      <property name="toolTip">
-      <string>&lt;nobr&gt;Determines whether the color sampler will sample&lt;/nobr&gt; colors from all visible layers or only the currently selected layer.</string>
+      <string>&lt;nobr&gt;Determines whether the color sampler will sample&lt;/nobr&gt; colors from all visible layers, the selected layer, or the selected layer and all visible layers below it.</string>
      </property>
      <property name="currentIndex">
       <number>0</number>
@@ -143,6 +143,11 @@
      <item>
       <property name="text">
        <string>Sample Current Layer</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Sample Current Layer and Below</string>
       </property>
      </item>
     </widget>

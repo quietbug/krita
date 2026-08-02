@@ -28,8 +28,9 @@
 
 namespace
 {
-// GUI ComboBox index constants
-const int SAMPLE_MERGED = 0;
+constexpr int SAMPLE_MERGED = 0;
+constexpr int SAMPLE_CURRENT_LAYER = 1;
+constexpr int SAMPLE_CURRENT_LAYER_AND_BELOW = 2;
 }
 
 KisToolColorSampler::KisToolColorSampler(KoCanvasBase *canvas)
@@ -149,7 +150,7 @@ void KisToolColorSampler::beginPrimaryAction(KoPointerEvent *event)
 
     bool useOtherColor = canvas()->resourceManager()->boolResource(KoCanvasResource::UsingOtherColor);
     // if useOtherColor is true, apply to the other color than that configured in the tool options
-    m_helper.activate(!m_config->sampleMerged, m_config->toForegroundColor != useOtherColor);
+    m_helper.activate(m_config->sampleSource, m_config->toForegroundColor != useOtherColor);
     m_helper.startAction(event->point, m_config->radius, m_config->blend);
     requestUpdateOutline(event->point, event);
 
@@ -185,7 +186,7 @@ void KisToolColorSampler::activatePrimaryAction()
      */
     bool useOtherColor = canvas()->resourceManager()->boolResource(KoCanvasResource::UsingOtherColor);
     // if useOtherColor is true, apply to the other color than that configured in the tool options
-    m_helper.updateCursor(!m_config->sampleMerged, m_config->toForegroundColor != useOtherColor);
+    m_helper.updateCursor(m_config->sampleSource, m_config->toForegroundColor != useOtherColor);
 }
 
 void KisToolColorSampler::deactivatePrimaryAction()
@@ -357,7 +358,7 @@ void KisToolColorSampler::updateOptionWidget()
 
     m_optionsWidget->cbNormaliseValues->setChecked(m_config->normaliseValues);
     m_optionsWidget->cbUpdateCurrentColor->setChecked(m_config->updateColor);
-    m_optionsWidget->cmbSources->setCurrentIndex(SAMPLE_MERGED + !m_config->sampleMerged);
+    m_optionsWidget->cmbSources->setCurrentIndex(static_cast<int>(m_config->sampleSource));
     m_optionsWidget->cbPalette->setChecked(m_config->addColorToCurrentPalette);
     m_optionsWidget->radius->setValue(m_config->radius);
     m_optionsWidget->blend->setValue(m_config->blend);
@@ -393,7 +394,18 @@ void KisToolColorSampler::slotChangeBlend(int value)
 
 void KisToolColorSampler::slotSetColorSource(int value)
 {
-    m_config->sampleMerged = value == SAMPLE_MERGED;
+    switch (value) {
+    case SAMPLE_CURRENT_LAYER:
+        m_config->sampleSource = KisToolUtils::ColorSamplerSource::CurrentLayer;
+        break;
+    case SAMPLE_CURRENT_LAYER_AND_BELOW:
+        m_config->sampleSource = KisToolUtils::ColorSamplerSource::CurrentLayerAndBelow;
+        break;
+    case SAMPLE_MERGED:
+    default:
+        m_config->sampleSource = KisToolUtils::ColorSamplerSource::MergedImage;
+        break;
+    }
 }
 
 void KisToolColorSampler::slotChangePalette(int)
