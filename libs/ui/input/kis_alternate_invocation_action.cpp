@@ -36,6 +36,8 @@ KisAlternateInvocationAction::KisAlternateInvocationAction()
 
     shortcuts.insert(i18n("Sample Foreground Color from Current Layer"), SampleColorFgLayerModeShortcut);
     shortcuts.insert(i18n("Sample Background Color from Current Layer"), SampleColorBgLayerModeShortcut);
+    shortcuts.insert(i18n("Sample Foreground Color from Current Layer and Below"), SampleColorFgLayerAndBelowModeShortcut);
+    shortcuts.insert(i18n("Sample Background Color from Current Layer and Below"), SampleColorBgLayerAndBelowModeShortcut);
 
     shortcuts.insert(i18n("Sample Foreground Color from Merged Image"), SampleColorFgImageModeShortcut);
     shortcuts.insert(i18n("Sample Background Color from Merged Image"), SampleColorBgImageModeShortcut);
@@ -63,6 +65,12 @@ KisTool::ToolAction KisAlternateInvocationAction::shortcutToToolAction(int short
         break;
     case SampleColorBgImageModeShortcut:
         action = KisTool::AlternateSampleBgImage;
+        break;
+    case SampleColorFgLayerAndBelowModeShortcut:
+        action = KisTool::AlternateSampleFgNodeAndBelow;
+        break;
+    case SampleColorBgLayerAndBelowModeShortcut:
+        action = KisTool::AlternateSampleBgNodeAndBelow;
         break;
     case PrimaryAlternateModeShortcut:
         action = KisTool::AlternateSecondary;

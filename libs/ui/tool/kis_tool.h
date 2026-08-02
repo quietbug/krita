@@ -122,6 +122,8 @@ public:
         AlternateSampleBgNode,
         AlternateSampleFgImage,
         AlternateSampleBgImage,
+        AlternateSampleFgNodeAndBelow,
+        AlternateSampleBgNodeAndBelow,
         AlternateSecondary,
         AlternateThird,
         AlternateFourth,
@@ -138,6 +140,8 @@ public:
         SampleBgNode = AlternateSampleBgNode, // Default: Ctrl+Alt+Right click
         SampleFgImage = AlternateSampleFgImage, // Default: Ctrl+Left click
         SampleBgImage = AlternateSampleBgImage, // Default: Ctrl+Right click
+        SampleFgNodeAndBelow = AlternateSampleFgNodeAndBelow,
+        SampleBgNodeAndBelow = AlternateSampleBgNodeAndBelow,
         Secondary = AlternateSecondary,
         Third = AlternateThird,
         Fourth = AlternateFourth,

@@ -288,11 +288,13 @@ void KisToolPaint::activateAlternateAction(AlternateAction action)
         return;
     }
 
-    const bool sampleCurrentLayer = action == SampleFgNode || action == SampleBgNode;
-    const bool sampleFgColor = action == SampleFgNode || action == SampleFgImage;
-    const KisToolUtils::ColorSamplerSource sampleSource = sampleCurrentLayer ?
-        KisToolUtils::ColorSamplerSource::CurrentLayer :
-        KisToolUtils::ColorSamplerSource::MergedImage;
+    const bool sampleFgColor = action == SampleFgNode || action == SampleFgImage || action == SampleFgNodeAndBelow;
+    KisToolUtils::ColorSamplerSource sampleSource = KisToolUtils::ColorSamplerSource::MergedImage;
+    if (action == SampleFgNode || action == SampleBgNode) {
+        sampleSource = KisToolUtils::ColorSamplerSource::CurrentLayer;
+    } else if (action == SampleFgNodeAndBelow || action == SampleBgNodeAndBelow) {
+        sampleSource = KisToolUtils::ColorSamplerSource::CurrentLayerAndBelow;
+    }
     m_colorSamplerHelper.activate(sampleSource, sampleFgColor);
 }
 
@@ -310,7 +312,9 @@ bool KisToolPaint::isSamplingAction(AlternateAction action) {
     return action == SampleFgNode ||
         action == SampleBgNode ||
         action == SampleFgImage ||
-        action == SampleBgImage;
+        action == SampleBgImage ||
+        action == SampleFgNodeAndBelow ||
+        action == SampleBgNodeAndBelow;
 }
 
 void KisToolPaint::beginAlternateAction(KoPointerEvent *event, AlternateAction action)

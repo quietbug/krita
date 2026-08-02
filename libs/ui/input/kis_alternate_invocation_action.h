@@ -31,7 +31,9 @@ public:
         SampleColorBgLayerModeShortcut,
         SampleColorFgImageModeShortcut,
         SampleColorBgImageModeShortcut,
-        TertiaryAlternateModeShortcut ///< Warning: don't reorder the items of this enum, it breaks user configs!
+        TertiaryAlternateModeShortcut, ///< Warning: don't reorder the items of this enum, it breaks user configs!
+        SampleColorFgLayerAndBelowModeShortcut,
+        SampleColorBgLayerAndBelowModeShortcut
     };
 
     explicit KisAlternateInvocationAction();
