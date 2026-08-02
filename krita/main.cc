@@ -95,8 +95,6 @@
 #include <kcrash.h>
 #elif defined USE_DRMINGW
 
-extern void qt_set_sequence_auto_mnemonic(bool);
-
 namespace
 {
 template<typename T, typename U>
@@ -129,6 +127,10 @@ void tryInitDrMingw()
     myExcHndlSetLogFileNameA(logFilePath.data());
 }
 } // namespace
+#endif
+
+#if defined HAVE_X11
+extern void qt_set_sequence_auto_mnemonic(bool);
 #endif
 
 namespace
