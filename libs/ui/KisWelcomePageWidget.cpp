@@ -8,6 +8,7 @@
 
 #include "KisWelcomePageWidget.h"
 #include "KisRecentDocumentsModelWrapper.h"
+#include "KisRecentFilesManager.h"
 #include <QDesktopServices>
 #include <QMimeData>
 #include <QPixmap>
@@ -31,7 +32,9 @@
 
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QMouseEvent>
 #include <QMenu>
+#include <QPainter>
 #include <QScrollBar>
 
 #include "kis_clipboard.h"
@@ -93,24 +96,78 @@ void ShowNewsAction::enableFromLink(QString unused_url)
 }
 
 
-// class to override item height for Breeze since qss seems to not work
+// Item delegate for the recent-document entries, including their inline remove button.
 class RecentItemDelegate : public QStyledItemDelegate
 {
-    int itemHeight = 0;
+    static constexpr int closeButtonSize = 16;
+
+    QRect closeButtonRect(const QStyleOptionViewItem &option) const
+    {
+        const QFontMetrics metrics(option.font);
+        return QRect(option.rect.right() - closeButtonSize + 1,
+                     option.rect.bottom() - metrics.height() - 2,
+                     closeButtonSize,
+                     closeButtonSize);
+    }
+
 public:
     RecentItemDelegate(QObject *parent = 0)
         : QStyledItemDelegate(parent)
     {
     }
 
-    void setItemHeight(int itemHeight)
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
-        this->itemHeight = itemHeight;
+        return QStyledItemDelegate::sizeHint(option, index)
+            + QSize(closeButtonSize + 4, 0);
     }
 
-    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &/*index*/) const override
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
-        return QSize(option.rect.width(), itemHeight);
+        QStyleOptionViewItem itemOption = option;
+        itemOption.rect.setRight(closeButtonRect(option).left() - 2);
+        QStyledItemDelegate::paint(painter, itemOption, index);
+
+        const QRect buttonRect = closeButtonRect(option);
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        if (option.state & QStyle::State_MouseOver) {
+            painter->setPen(QPen(option.palette.highlight().color(), 1));
+            painter->setBrush(option.palette.highlight());
+            painter->drawRoundedRect(buttonRect.adjusted(1, 1, -1, -1), 2, 2);
+        }
+        painter->setPen(QPen(option.palette.text().color(), 1.5, Qt::SolidLine, Qt::RoundCap));
+        const QRect crossRect = buttonRect.adjusted(5, 5, -5, -5);
+        painter->drawLine(crossRect.topLeft(), crossRect.bottomRight());
+        painter->drawLine(crossRect.topRight(), crossRect.bottomLeft());
+        painter->restore();
+    }
+
+    bool editorEvent(QEvent *event, QAbstractItemModel *model,
+                     const QStyleOptionViewItem &option, const QModelIndex &index) override
+    {
+        Q_UNUSED(model);
+        if (!index.isValid()) {
+            return false;
+        }
+
+        if (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseButtonRelease) {
+            const QMouseEvent *mouseEvent = static_cast<const QMouseEvent *>(event);
+            QPoint mousePosition;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            mousePosition = mouseEvent->position().toPoint();
+#else
+            mousePosition = mouseEvent->pos();
+#endif
+            if (mouseEvent->button() == Qt::LeftButton && closeButtonRect(option).contains(mousePosition)) {
+                if (event->type() == QEvent::MouseButtonRelease) {
+                    KisRecentFilesManager::instance()->remove(index.data(Qt::UserRole + 1).toUrl());
+                }
+                return true;
+            }
+        }
+
+        return QStyledItemDelegate::editorEvent(event, model, option, index);
     }
 };
 
@@ -130,15 +187,15 @@ KisWelcomePageWidget::KisWelcomePageWidget(QWidget *parent)
 
     // Recent docs...
     recentDocumentsListView->setDragEnabled(false);
+    recentDocumentsListView->setMouseTracking(true);
     recentDocumentsListView->viewport()->setAutoFillBackground(false);
     recentDocumentsListView->setSpacing(2);
     recentDocumentsListView->installEventFilter(this);
     recentDocumentsListView->setViewMode(QListView::IconMode);
     recentDocumentsListView->setSelectionMode(QAbstractItemView::NoSelection);
 
-//    m_recentItemDelegate.reset(new RecentItemDelegate(this));
-//    m_recentItemDelegate->setItemHeight(KisRecentDocumentsModelWrapper::ICON_SIZE_LENGTH);
-//    recentDocumentsListView->setItemDelegate(m_recentItemDelegate.data());
+    m_recentItemDelegate.reset(new RecentItemDelegate(this));
+    recentDocumentsListView->setItemDelegate(m_recentItemDelegate.data());
     recentDocumentsListView->setIconSize(QSize(KisRecentDocumentsModelWrapper::ICON_SIZE_LENGTH, KisRecentDocumentsModelWrapper::ICON_SIZE_LENGTH));
     recentDocumentsListView->setVerticalScrollMode(QListView::ScrollPerPixel);
     recentDocumentsListView->verticalScrollBar()->setSingleStep(50);
