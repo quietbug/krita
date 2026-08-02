@@ -199,8 +199,8 @@ KisWelcomePageWidget::KisWelcomePageWidget(QWidget *parent)
     recentDocumentsListView->setViewMode(QListView::IconMode);
     recentDocumentsListView->setSelectionMode(QAbstractItemView::NoSelection);
 
-    m_recentItemDelegate.reset(new RecentItemDelegate(this));
-    recentDocumentsListView->setItemDelegate(m_recentItemDelegate.data());
+    recentItemDelegate.reset(new RecentItemDelegate(this));
+    recentDocumentsListView->setItemDelegate(recentItemDelegate.data());
     recentDocumentsListView->setIconSize(QSize(KisRecentDocumentsModelWrapper::ICON_SIZE_LENGTH, KisRecentDocumentsModelWrapper::ICON_SIZE_LENGTH));
     recentDocumentsListView->setVerticalScrollMode(QListView::ScrollPerPixel);
     recentDocumentsListView->verticalScrollBar()->setSingleStep(50);
