@@ -40,6 +40,7 @@ public:
 
     qreal startZoom {1.0};
     qreal lastDiscreteZoomDistance {0.0};
+    qreal dragSpeedMultiplier {1.0};
 };
 
 QPointF KisZoomAction::Private::centerPoint(QTouchEvent* event)
@@ -115,6 +116,7 @@ void KisZoomAction::begin(int shortcut, QEvent *event)
     KisAbstractInputAction::begin(shortcut, event);
 
     d->lastDistance = 0.f;
+    d->dragSpeedMultiplier = KisConfig(true).zoomDragSpeedMultiplier();
 
     switch(shortcut) {
         case ZoomModeShortcut:
@@ -293,6 +295,7 @@ void KisZoomAction::inputEvent( QEvent* event )
 void KisZoomAction::cursorMovedAbsolute(const QPointF &startPos, const QPointF &pos)
 {
     QPointF diff = -(pos - startPos);
+    diff *= d->dragSpeedMultiplier;
 
     const int stepCont = 100;
     const int stepDisc = 50;
@@ -370,4 +373,3 @@ KisInputActionGroup KisZoomAction::inputActionGroup(int shortcut) const
     Q_UNUSED(shortcut);
     return ViewTransformActionGroup;
 }
-

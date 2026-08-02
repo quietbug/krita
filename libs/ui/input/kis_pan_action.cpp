@@ -18,6 +18,7 @@
 #include <kis_canvas2.h>
 
 #include "kis_input_manager.h"
+#include "kis_config.h"
 
 class KisPanAction::Private
 {
@@ -30,6 +31,7 @@ public:
 
     QPointF lastPosition;
     QPointF originalPreferredCenter;
+    qreal dragSpeedMultiplier {1.0};
     int touchPointsCount { 0 };
 };
 
@@ -95,6 +97,7 @@ void KisPanAction::begin(int shortcut, QEvent *event)
             }
 
             d->originalPreferredCenter = inputManager()->canvas()->canvasController()->preferredCenter();
+            d->dragSpeedMultiplier = KisConfig(true).panDragSpeedMultiplier();
 
             break;
         }
@@ -159,7 +162,8 @@ void KisPanAction::inputEvent(QEvent *event)
 
 void KisPanAction::cursorMovedAbsolute(const QPointF &startPos, const QPointF &pos)
 {
-    inputManager()->canvas()->canvasController()->setPreferredCenter(-pos + startPos + d->originalPreferredCenter);
+    inputManager()->canvas()->canvasController()->setPreferredCenter(
+        -(pos - startPos) * d->dragSpeedMultiplier + d->originalPreferredCenter);
 }
 
 QPointF KisPanAction::Private::averagePoint( QTouchEvent* event, int *outCount )

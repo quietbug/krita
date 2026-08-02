@@ -2939,6 +2939,46 @@ void KisConfig::setLayerThumbnailGenerationTimeout(int value)
     m_cfg.writeEntry("layerThumbnailGenerationTimeout", value);
 }
 
+qreal KisConfig::brushResizeSpeedMultiplier(bool defaultValue) const
+{
+    return defaultValue ? 2.0 : m_cfg.readEntry<qreal>("brushResizeSpeedMultiplier", 2.0);
+}
+
+void KisConfig::setBrushResizeSpeedMultiplier(qreal value) const
+{
+    m_cfg.writeEntry("brushResizeSpeedMultiplier", value);
+}
+
+qreal KisConfig::zoomDragSpeedMultiplier(bool defaultValue) const
+{
+    return defaultValue ? 1.0 : m_cfg.readEntry<qreal>("zoomDragSpeedMultiplier", 1.0);
+}
+
+void KisConfig::setZoomDragSpeedMultiplier(qreal value) const
+{
+    m_cfg.writeEntry("zoomDragSpeedMultiplier", value);
+}
+
+qreal KisConfig::rotationDragSpeedMultiplier(bool defaultValue) const
+{
+    return defaultValue ? 1.0 : m_cfg.readEntry<qreal>("rotationDragSpeedMultiplier", 1.0);
+}
+
+void KisConfig::setRotationDragSpeedMultiplier(qreal value) const
+{
+    m_cfg.writeEntry("rotationDragSpeedMultiplier", value);
+}
+
+qreal KisConfig::panDragSpeedMultiplier(bool defaultValue) const
+{
+    return defaultValue ? 1.0 : m_cfg.readEntry<qreal>("panDragSpeedMultiplier", 1.0);
+}
+
+void KisConfig::setPanDragSpeedMultiplier(qreal value) const
+{
+    m_cfg.writeEntry("panDragSpeedMultiplier", value);
+}
+
 #include <QDomDocument>
 #include <QDomElement>
 
@@ -3065,4 +3105,3 @@ QDebug operator<<(QDebug debug, const KisConfig::CanvasSurfaceBitDepthMode &mode
 
     return debug.space();
 }
-

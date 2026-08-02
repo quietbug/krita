@@ -120,6 +120,7 @@ private:
     QPointF m_initialGestureDocPoint;
     QPointF m_lastDocumentPoint;
     qreal m_lastPaintOpSize {0.0};
+    qreal m_brushResizeSpeedMultiplier {2.0};
     QPoint m_initialGestureGlobalPoint;
 
     bool m_paintopBasedSamplingInAction {false};

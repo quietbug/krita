@@ -9,7 +9,10 @@
 #include "ui_kis_input_configuration_page.h"
 
 #include <QDebug>
+#include <QDoubleSpinBox>
 #include <QDir>
+#include <QFormLayout>
+#include <QLabel>
 #include <QMap>
 
 #include "input/kis_input_profile_manager.h"
@@ -28,6 +31,10 @@
 
 struct KisInputConfigurationPage::Private {
     QMap<KisAbstractInputAction *, KisInputConfigurationPageItem*> actionInputConfigurationMap;
+    QDoubleSpinBox *brushResizeSpeedMultiplier {nullptr};
+    QDoubleSpinBox *zoomDragSpeedMultiplier {nullptr};
+    QDoubleSpinBox *rotationDragSpeedMultiplier {nullptr};
+    QDoubleSpinBox *panDragSpeedMultiplier {nullptr};
 };
 
 KisInputConfigurationPage::KisInputConfigurationPage(QWidget *parent, Qt::WindowFlags f)
@@ -49,6 +56,42 @@ KisInputConfigurationPage::KisInputConfigurationPage(QWidget *parent, Qt::Window
             &KisInputProfileManager::currentProfileChanged,
             this,
             &KisInputConfigurationPage::checkForConflicts);
+
+    QWidget *dragSpeedSettingsWidget = new QWidget(this);
+    QFormLayout *dragSpeedSettingsLayout = new QFormLayout(dragSpeedSettingsWidget);
+    dragSpeedSettingsLayout->setContentsMargins(0, 0, 0, 0);
+    auto addMultiplierSetting = [dragSpeedSettingsWidget, dragSpeedSettingsLayout](const QString &label,
+                                                                                    const QString &toolTip,
+                                                                                    qreal value) {
+        QDoubleSpinBox *spinBox = new QDoubleSpinBox(dragSpeedSettingsWidget);
+        spinBox->setRange(0.1, 10.0);
+        spinBox->setDecimals(2);
+        spinBox->setSingleStep(0.1);
+        spinBox->setSuffix(QStringLiteral(" ×"));
+        spinBox->setToolTip(toolTip);
+        spinBox->setValue(value);
+        QLabel *labelWidget = new QLabel(label, dragSpeedSettingsWidget);
+        labelWidget->setToolTip(toolTip);
+        dragSpeedSettingsLayout->addRow(labelWidget, spinBox);
+        return spinBox;
+    };
+    m_d->brushResizeSpeedMultiplier = addMultiplierSetting(
+        i18n("Brush Resize Speed Multiplier"),
+        i18n("Multiplier for the speed of resizing the brush with the canvas input shortcut."),
+        KisConfig(true).brushResizeSpeedMultiplier());
+    m_d->zoomDragSpeedMultiplier = addMultiplierSetting(
+        i18n("Zoom Drag Speed Multiplier"),
+        i18n("Multiplier for the speed of zooming with the canvas input shortcut."),
+        KisConfig(true).zoomDragSpeedMultiplier());
+    m_d->rotationDragSpeedMultiplier = addMultiplierSetting(
+        i18n("Rotation Drag Speed Multiplier"),
+        i18n("Multiplier for the speed of rotating with the canvas input shortcut."),
+        KisConfig(true).rotationDragSpeedMultiplier());
+    m_d->panDragSpeedMultiplier = addMultiplierSetting(
+        i18n("Pan Drag Speed Multiplier"),
+        i18n("Multiplier for the speed of panning with the canvas input shortcut."),
+        KisConfig(true).panDragSpeedMultiplier());
+    ui->configurationItemsArea->addWidget(dragSpeedSettingsWidget);
 
     QList<KisAbstractInputAction *> actions = KisInputProfileManager::instance()->actions();
     Q_FOREACH(KisAbstractInputAction * action, actions) {
@@ -76,11 +119,20 @@ KisInputConfigurationPage::~KisInputConfigurationPage() = default;
 
 void KisInputConfigurationPage::saveChanges()
 {
+    KisConfig config(false);
+    config.setBrushResizeSpeedMultiplier(m_d->brushResizeSpeedMultiplier->value());
+    config.setZoomDragSpeedMultiplier(m_d->zoomDragSpeedMultiplier->value());
+    config.setRotationDragSpeedMultiplier(m_d->rotationDragSpeedMultiplier->value());
+    config.setPanDragSpeedMultiplier(m_d->panDragSpeedMultiplier->value());
     KisInputProfileManager::instance()->saveProfiles();
 }
 
 void KisInputConfigurationPage::revertChanges()
 {
+    m_d->brushResizeSpeedMultiplier->setValue(KisConfig(true).brushResizeSpeedMultiplier());
+    m_d->zoomDragSpeedMultiplier->setValue(KisConfig(true).zoomDragSpeedMultiplier());
+    m_d->rotationDragSpeedMultiplier->setValue(KisConfig(true).rotationDragSpeedMultiplier());
+    m_d->panDragSpeedMultiplier->setValue(KisConfig(true).panDragSpeedMultiplier());
     KisInputProfileManager::instance()->loadProfiles();
 }
 
@@ -148,6 +200,11 @@ void KisInputConfigurationPage::checkForConflicts()
 void KisInputConfigurationPage::setDefaults()
 {
     KisSignalsBlocker(ui->profileComboBox, KisInputProfileManager::instance());
+
+    m_d->brushResizeSpeedMultiplier->setValue(KisConfig(true).brushResizeSpeedMultiplier(true));
+    m_d->zoomDragSpeedMultiplier->setValue(KisConfig(true).zoomDragSpeedMultiplier(true));
+    m_d->rotationDragSpeedMultiplier->setValue(KisConfig(true).rotationDragSpeedMultiplier(true));
+    m_d->panDragSpeedMultiplier->setValue(KisConfig(true).panDragSpeedMultiplier(true));
 
     QDir profileDir(KoResourcePaths::saveLocation("data", "input/", false));
     KisConfig(false).setCurrentInputProfile("Krita Default");

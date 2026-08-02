@@ -338,6 +338,7 @@ void KisToolFreehand::beginAlternateAction(KoPointerEvent *event, AlternateActio
 
     m_lastDocumentPoint = event->point;
     m_lastPaintOpSize = currentPaintOpPreset()->settings()->paintOpSize();
+    m_brushResizeSpeedMultiplier = KisConfig(true).brushResizeSpeedMultiplier();
 
     m_beginAlternateActionEvent = event->deepCopyEvent();
     requestUpdateOutline(m_initialGestureDocPoint, &m_beginAlternateActionEvent->event);
@@ -372,12 +373,10 @@ void KisToolFreehand::continueAlternateAction(KoPointerEvent *event, AlternateAc
     const qreal scaleCoeff = effectiveMaxBrushSize / effectiveMaxDragSize;
     const qreal sizeDiff = scaleCoeff * offset.x() ;
 
-    const qreal sizeMult = 2.0; // resize speed multiplier
-
     if (qAbs(sizeDiff) > 0.01) {
         KisPaintOpSettingsSP settings = currentPaintOpPreset()->settings();
 
-        qreal newSize = m_lastPaintOpSize + sizeDiff * sizeMult;
+        qreal newSize = m_lastPaintOpSize + sizeDiff * m_brushResizeSpeedMultiplier;
 
         if (action == ChangeSizeSnap) {
             newSize = qMax(qRound(newSize), 1);

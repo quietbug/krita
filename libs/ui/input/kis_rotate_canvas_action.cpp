@@ -14,6 +14,7 @@
 #include "kis_canvas_controller.h"
 #include <kis_canvas2.h>
 #include "kis_input_manager.h"
+#include "kis_config.h"
 #include <KoViewTransformStillPoint.h>
 
 #include <math.h>
@@ -32,6 +33,7 @@ public:
     qreal snapRotation {0.0};
     qreal touchRotation {0.0};
     bool allowRotation {false};
+    qreal dragSpeedMultiplier {1.0};
     KoViewTransformStillPoint actionStillPoint;
 };
 
@@ -84,6 +86,7 @@ void KisRotateCanvasAction::begin(int shortcut, QEvent *event)
     d->previousAngle = 0;
     d->snapRotation = 0;
     d->touchRotation = 0;
+    d->dragSpeedMultiplier = KisConfig(true).rotationDragSpeedMultiplier();
 
     KisCanvasController *canvasController =
         dynamic_cast<KisCanvasController*>(inputManager()->canvas()->canvasController());
@@ -148,6 +151,7 @@ void KisRotateCanvasAction::cursorMovedAbsolute(const QPointF &startPos, const Q
     const qreal newAngle = atan2(newPoint.y(), newPoint.x());
 
     qreal newRotation = (180 / M_PI) * (newAngle - oldAngle);
+    newRotation *= d->dragSpeedMultiplier;
 
     if (d->mode == DiscreteRotateModeShortcut) {
         // Do not snap unless the user rotated half-way in the desired direction.

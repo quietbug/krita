@@ -818,6 +818,18 @@ public:
     int layerThumbnailGenerationTimeout(bool defaultValue = false) const;
     void setLayerThumbnailGenerationTimeout(int value);
 
+    qreal brushResizeSpeedMultiplier(bool defaultValue = false) const;
+    void setBrushResizeSpeedMultiplier(qreal value) const;
+
+    qreal zoomDragSpeedMultiplier(bool defaultValue = false) const;
+    void setZoomDragSpeedMultiplier(qreal value) const;
+
+    qreal rotationDragSpeedMultiplier(bool defaultValue = false) const;
+    void setRotationDragSpeedMultiplier(qreal value) const;
+
+    qreal panDragSpeedMultiplier(bool defaultValue = false) const;
+    void setPanDragSpeedMultiplier(qreal value) const;
+
     template<class T>
     void writeEntry(const QString& name, const T& value) {
         m_cfg.writeEntry(name, value);
