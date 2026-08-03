@@ -177,10 +177,9 @@ KisWelcomePageWidget::KisWelcomePageWidget(QWidget *parent)
 {
     setupUi(this);
 
-    // Hide the News area on the welcome page.
-    newsTitleLabel->hide();
-    btnNewsOptions->hide();
-    newsFrame->hide();
+    // Hide the News column on the welcome page and let Recent Images use its space.
+    widgetRight->hide();
+    widgetCenter->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     // URLs that go to web browser...
     devBuildIcon->setIcon(KisIconUtils::loadIcon("warning"));
