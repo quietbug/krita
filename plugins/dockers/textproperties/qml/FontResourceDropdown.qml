@@ -20,4 +20,5 @@ Kis.ResourcePopup {
         }
     }
     view.preferredHeight: 300; // roughly 3.5 times the font delegate size;
+    view.maximumFlickVelocity: 0;
 }

@@ -54,6 +54,9 @@ Control {
      */
     property alias resourceDelegate : view.delegate;
 
+    // Allow resource selectors to disable flick inertia for their list view.
+    property alias maximumFlickVelocity: view.maximumFlickVelocity;
+
     /*
         \qmlProperty addResourceRowVisible
         Whether the resource row should be visible.
