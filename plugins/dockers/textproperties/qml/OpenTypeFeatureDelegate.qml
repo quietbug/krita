@@ -6,6 +6,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 import org.krita.flake.text 1.0
 import org.krita.components 1.0 as Kis
 
@@ -113,6 +114,6 @@ ItemDelegate {
     Kis.ToolTipBase {
         parent: root;
         text: root.toolTip;
-        visible: root.highlighted;
+        visible: root.highlighted && root.Window.window !== null;
     }
 }

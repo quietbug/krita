@@ -44,7 +44,8 @@ KisCanvasState KisCanvasState::fromConverter(const KisCoordinatesConverter &conv
     state.maximumZoom = converter.maxZoom();
     state.imageRectInWidgetPixels = converter.imageRectInWidgetPixels();
 
-    if (state.imageRectInWidgetPixels.topLeft() != -state.documentOffsetF) {
+    if (!state.imageRectInWidgetPixels.isEmpty()
+        && state.imageRectInWidgetPixels.topLeft() != -state.documentOffsetF) {
         qWarning() << "The imageRectInWidgetPixels topLeft() does not match the documentOffsetF!";
         qWarning() << "    imageRectInWidgetPixels:" << state.imageRectInWidgetPixels;
         qWarning() << "    documentOffsetF:" << state.documentOffsetF;
