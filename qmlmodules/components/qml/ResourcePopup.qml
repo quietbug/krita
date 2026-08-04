@@ -34,6 +34,10 @@ Button {
      */
     property bool useFileName : true;
 
+    // When enabled, keyboard and wheel navigation changes the current
+    // resource directly while the popup is closed.
+    property bool cycleCurrentResourceOnNavigation: false;
+
     /*
         \qmlProperty view
         The resource view inside the popup.
@@ -142,20 +146,58 @@ Button {
             }
         }
 
-        Keys.onDownPressed: {
-            if (completerPopup.opened) {
-                completerView.downPress();
+        Keys.onPressed: (event) => {
+            if (event.key !== Qt.Key_Down && event.key !== Qt.Key_Up) {
+                return;
+            }
+
+            if (resourceCmbPopup.opened || completerPopup.opened) {
+                if (completerPopup.opened) {
+                    event.key === Qt.Key_Down ? completerView.downPress() : completerView.upPress();
+                } else {
+                    event.key === Qt.Key_Down ? resourceView.downPress() : resourceView.upPress();
+                }
+                event.accepted = true;
+            } else if (resourceCmb.cycleCurrentResourceOnNavigation) {
+                resourceCmb.cycleCurrentResource(event.key === Qt.Key_Down ? 1 : -1);
+                event.accepted = true;
             } else {
-                resourceView.downPress();
+                event.key === Qt.Key_Down ? resourceView.downPress() : resourceView.upPress();
+                event.accepted = true;
             }
         }
-        Keys.onUpPressed: {
-            if (completerPopup.opened) {
-                completerView.upPress();
-            } else {
-                resourceView.upPress();
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.NoButton
+            enabled: resourceCmb.cycleCurrentResourceOnNavigation
+                     && textInput.activeFocus
+                     && !resourceCmbPopup.opened
+                     && !completerPopup.opened
+
+            onWheel: (event) => {
+                let delta = event.angleDelta.y;
+                if (delta === 0) {
+                    delta = event.pixelDelta.y;
+                }
+                delta *= event.inverted ? -1 : 1;
+
+                if (delta !== 0) {
+                    resourceCmb.cycleCurrentResource(delta > 0 ? -1 : 1);
+                    event.accepted = true;
+                }
             }
         }
+    }
+
+    function cycleCurrentResource(delta) {
+        const currentIndex = modelWrapper.currentIndex;
+        const nextIndex = currentIndex + delta;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= resourceView.resourceCount) {
+            return;
+        }
+        modelWrapper.currentIndex = nextIndex;
+        resourceCmb.activated();
     }
 
     indicator: Image {
