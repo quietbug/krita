@@ -56,6 +56,7 @@
 #include <QDir>
 
 #include <array>
+#include <algorithm>
 
 #include "config-updaters.h"
 
@@ -685,6 +686,16 @@ void KisWelcomePageWidget::showDevVersionHighlight()
 
 void KisWelcomePageWidget::recentDocumentClicked(QModelIndex index)
 {
+    const QUrl url = index.data(Qt::UserRole + 1).toUrl();
+    const auto recentFiles = KisRecentFilesManager::instance()->recentFiles();
+    const bool isStillRecent = std::any_of(recentFiles.cbegin(), recentFiles.cend(),
+                                           [&url](const KisRecentFilesEntry &entry) {
+                                               return entry.m_url == url;
+                                           });
+    if (!isStillRecent) {
+        return;
+    }
+
     QString fileUrl = index.data(Qt::ToolTipRole).toString();
     m_mainWindow->openDocument(fileUrl, KisMainWindow::None );
 }

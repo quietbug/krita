@@ -150,7 +150,9 @@ void KisRecentFilesManager::add(const QUrl &url)
     // remove oldest item if already maxitems in list
     if (m_d->m_entries.count() >= m_d->m_maxItems) {
         // remove oldest added item
+        const QUrl removedUrl = m_d->m_entries.constFirst().m_url;
         m_d->m_entries.removeFirst();
+        Q_EMIT fileRemoved(removedUrl);
     }
 
     m_d->m_entries.append(KisRecentFilesEntry {

@@ -155,8 +155,8 @@ ColumnLayout {
             id: propertiesWidgetView
 
             anchors.fill: parent;
-            // Keep regular scrolling, but do not continue moving after the drag ends.
-            maximumFlickVelocity: 0;
+            // Keep regular scrolling, but stop the list when a flick starts.
+            onFlickStarted: cancelFlick();
             ScrollBar.vertical: ScrollBar {
             }
 

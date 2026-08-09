@@ -54,8 +54,9 @@ Control {
      */
     property alias resourceDelegate : view.delegate;
 
-    // Allow resource selectors to disable flick inertia for their list view.
-    property alias maximumFlickVelocity: view.maximumFlickVelocity;
+    // Allow resource selectors to stop a flick after it starts without
+    // suppressing ordinary wheel scrolling.
+    property bool flickInertiaEnabled: true;
 
     /*
         \qmlProperty addResourceRowVisible
@@ -298,6 +299,12 @@ Control {
                 anchors.fill: parent;
                 id: view;
                 currentIndex: modelWrapper.currentIndex;
+
+                onFlickStarted: {
+                    if (!control.flickInertiaEnabled) {
+                        cancelFlick();
+                    }
+                }
 
                 Keys.onDownPressed: control.downPress();
                 Keys.onUpPressed: control.upPress();
