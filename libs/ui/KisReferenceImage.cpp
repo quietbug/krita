@@ -44,7 +44,11 @@ struct KisReferenceImage::Private : public QSharedData
 
     QImage image;
     QImage cachedImage;
+    QImage originalAlpha;
     KisQImagePyramid mipmap;
+
+    // Filename within .kra for the alpha backup used by ROI clear.
+    QString roiAlphaFilename;
 
     qreal saturation{1.0};
     int id{-1};
@@ -105,6 +109,42 @@ struct KisReferenceImage::Private : public QSharedData
         }
 
         mipmap = KisQImagePyramid(cachedImage, false);
+    }
+
+    void ensureAlphaChannel() {
+        if (!image.hasAlphaChannel()) {
+            image = image.convertToFormat(QImage::Format_ARGB32);
+        }
+    }
+
+    QImage alphaChannelCopy() const {
+        QImage result(image.size(), QImage::Format_Grayscale8);
+
+        for (int y = 0; y < image.height(); y++) {
+            uchar *dst = result.scanLine(y);
+            for (int x = 0; x < image.width(); x++) {
+                dst[x] = image.pixelColor(x, y).alpha();
+            }
+        }
+
+        return result;
+    }
+
+    bool restoreOriginalAlpha() {
+        if (originalAlpha.size() != image.size()) {
+            return false;
+        }
+
+        for (int y = 0; y < image.height(); y++) {
+            const uchar *src = originalAlpha.constScanLine(y);
+            for (int x = 0; x < image.width(); x++) {
+                QColor pixel = image.pixelColor(x, y);
+                pixel.setAlpha(src[x]);
+                image.setPixelColor(x, y, pixel);
+            }
+        }
+
+        return true;
     }
 };
 
@@ -272,7 +312,8 @@ qreal KisReferenceImage::saturation() const
 
 void KisReferenceImage::setEmbed(bool embed)
 {
-    KIS_SAFE_ASSERT_RECOVER_RETURN(embed || !d->externalFilename.isEmpty());
+    KIS_SAFE_ASSERT_RECOVER_RETURN(embed ||
+                                   (!d->externalFilename.isEmpty() && d->originalAlpha.isNull()));
     d->embed = embed;
 }
 
@@ -327,6 +368,9 @@ void KisReferenceImage::saveXml(QDomDocument &document, QDomElement &parentEleme
 
     if (d->embed) {
         d->internalFilename = QString("reference_images/%1.png").arg(id);
+        d->roiAlphaFilename = d->originalAlpha.isNull()
+                ? QString()
+                : QString("reference_images/%1_roi_alpha.png").arg(id);
     }
     
     const QString src = d->embed ? d->internalFilename : (QString("file://") + d->externalFilename);
@@ -340,6 +384,9 @@ void KisReferenceImage::saveXml(QDomDocument &document, QDomElement &parentEleme
 
     element.setAttribute("opacity", KisDomUtils::toString(1.0 - transparency()));
     element.setAttribute("saturation", KisDomUtils::toString(d->saturation));
+    if (!d->roiAlphaFilename.isEmpty()) {
+        element.setAttribute("roi-alpha", d->roiAlphaFilename);
+    }
 
     parentElement.appendChild(element);
 }
@@ -357,6 +404,8 @@ KisReferenceImage * KisReferenceImage::fromXml(const QDomElement &elem)
         reference->d->internalFilename = src;
         reference->d->embed = true;
     }
+
+    reference->d->roiAlphaFilename = elem.attribute("roi-alpha");
 
     qreal width = KisDomUtils::toDouble(elem.attribute("width", "100"));
     qreal height = KisDomUtils::toDouble(elem.attribute("height", "100"));
@@ -390,7 +439,25 @@ bool KisReferenceImage::saveImage(KoStore *store) const
         saved = d->image.save(&storeDev, "PNG");
     }
 
-    return store->close() && saved;
+    if (!store->close() || !saved) {
+        return false;
+    }
+
+    if (d->originalAlpha.isNull()) {
+        return true;
+    }
+
+    if (!store->open(d->roiAlphaFilename)) {
+        return false;
+    }
+
+    bool savedAlpha = false;
+    KoStoreDevice alphaStoreDev(store);
+    if (alphaStoreDev.open(QIODevice::WriteOnly)) {
+        savedAlpha = d->originalAlpha.save(&alphaStoreDev, "PNG");
+    }
+
+    return store->close() && savedAlpha;
 }
 
 bool KisReferenceImage::loadImage(KoStore *store)
@@ -412,12 +479,109 @@ bool KisReferenceImage::loadImage(KoStore *store)
         return false;
     }
 
-    return store->close();
+    if (!store->close()) {
+        return false;
+    }
+
+    if (d->roiAlphaFilename.isEmpty()) {
+        return true;
+    }
+
+    if (!store->open(d->roiAlphaFilename)) {
+        return false;
+    }
+
+    KoStoreDevice alphaStoreDev(store);
+    if (!alphaStoreDev.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+
+    if (!d->originalAlpha.load(&alphaStoreDev, "PNG")) {
+        return false;
+    }
+
+    d->originalAlpha = d->originalAlpha.convertToFormat(QImage::Format_Grayscale8);
+
+    return store->close() && d->originalAlpha.size() == d->image.size();
 }
 
 QImage KisReferenceImage::getImage()
 {
     return d->image;
+}
+
+bool KisReferenceImage::applyRoi(const QPointF &startDocument, const QPointF &endDocument)
+{
+    if (d->image.isNull() || size().isEmpty()) {
+        return false;
+    }
+
+    bool invertible = false;
+    const QTransform inverseTransform = absoluteTransformation().inverted(&invertible);
+    if (!invertible) {
+        return false;
+    }
+
+    const QPointF startLocal = inverseTransform.map(startDocument);
+    const QPointF endLocal = inverseTransform.map(endDocument);
+    const QSizeF shapeSize = size();
+    const QPointF startPixel(startLocal.x() * d->image.width() / shapeSize.width(),
+                             startLocal.y() * d->image.height() / shapeSize.height());
+    const QPointF endPixel(endLocal.x() * d->image.width() / shapeSize.width(),
+                           endLocal.y() * d->image.height() / shapeSize.height());
+    const QRect roi = QRectF(startPixel, endPixel).normalized().toAlignedRect().intersected(d->image.rect());
+
+    if (roi.isEmpty()) {
+        return false;
+    }
+
+    d.detach();
+    d->ensureAlphaChannel();
+
+    if (d->originalAlpha.isNull()) {
+        d->originalAlpha = d->alphaChannelCopy();
+    } else if (!d->restoreOriginalAlpha()) {
+        d->originalAlpha = d->alphaChannelCopy();
+    }
+
+    for (int y = 0; y < d->image.height(); y++) {
+        const uchar *original = d->originalAlpha.constScanLine(y);
+        for (int x = 0; x < d->image.width(); x++) {
+            QColor pixel = d->image.pixelColor(x, y);
+            pixel.setAlpha(roi.contains(x, y) ? original[x] : 0);
+            d->image.setPixelColor(x, y, pixel);
+        }
+    }
+
+    d->cachedImage = QImage();
+    update();
+    return true;
+}
+
+bool KisReferenceImage::clearRoi()
+{
+    if (d->originalAlpha.isNull()) {
+        return false;
+    }
+
+    d.detach();
+    d->ensureAlphaChannel();
+    if (!d->restoreOriginalAlpha()) {
+        d->originalAlpha = QImage();
+        d->roiAlphaFilename.clear();
+        return false;
+    }
+
+    d->originalAlpha = QImage();
+    d->roiAlphaFilename.clear();
+    d->cachedImage = QImage();
+    update();
+    return true;
+}
+
+bool KisReferenceImage::hasRoi() const
+{
+    return !d->originalAlpha.isNull();
 }
 
 KoShape *KisReferenceImage::cloneShape() const

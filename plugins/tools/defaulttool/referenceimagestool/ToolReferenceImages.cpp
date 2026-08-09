@@ -13,8 +13,10 @@
 #include <QMessageBox>
 #include <QAction>
 #include <QApplication>
+#include <QPainter>
 
 #include <KoSelection.h>
+#include <KoPointerEvent.h>
 #include <KoShapeRegistry.h>
 #include <KoShapeManager.h>
 #include <KoShapeController.h>
@@ -63,7 +65,97 @@ void ToolReferenceImages::activate(const QSet<KoShape*> &shapes)
 
 void ToolReferenceImages::deactivate()
 {
+    cancelRoiCreation();
     DefaultTool::deactivate();
+}
+
+void ToolReferenceImages::mousePressEvent(KoPointerEvent *event)
+{
+    if (m_roiCreationMode && (event->button() & Qt::LeftButton)) {
+        m_roiImage = selectedEmbeddedReferenceImage();
+        if (!m_roiImage) {
+            cancelRoiCreation();
+            event->ignore();
+            return;
+        }
+
+        m_roiDragStart = event->point;
+        m_roiDragEnd = event->point;
+        m_roiDragging = true;
+        event->accept();
+        repaintDecorations();
+        return;
+    }
+
+    DefaultTool::mousePressEvent(event);
+}
+
+void ToolReferenceImages::mouseMoveEvent(KoPointerEvent *event)
+{
+    if (m_roiDragging) {
+        m_roiDragEnd = event->point;
+        event->accept();
+        repaintDecorations();
+        return;
+    }
+
+    DefaultTool::mouseMoveEvent(event);
+}
+
+void ToolReferenceImages::mouseReleaseEvent(KoPointerEvent *event)
+{
+    if (m_roiDragging && (event->button() & Qt::LeftButton)) {
+        m_roiDragEnd = event->point;
+        KisReferenceImage *reference = selectedEmbeddedReferenceImage();
+        const bool appliesToOriginalSelection = reference && reference == m_roiImage;
+        m_roiDragging = false;
+        m_roiCreationMode = false;
+        m_roiImage = nullptr;
+
+        if (appliesToOriginalSelection) {
+            if (reference->applyRoi(m_roiDragStart, m_roiDragEnd)) {
+                document()->setModified(true);
+            }
+        }
+
+        if (m_optionsWidget && koSelection()) {
+            m_optionsWidget->selectionChanged(koSelection());
+        }
+
+        event->accept();
+        repaintDecorations();
+        return;
+    }
+
+    DefaultTool::mouseReleaseEvent(event);
+}
+
+void ToolReferenceImages::paint(QPainter &painter, const KoViewConverter &converter)
+{
+    DefaultTool::paint(painter, converter);
+
+    if (!m_roiDragging) {
+        return;
+    }
+
+    QPen pen(QColor(8, 60, 167, 204), 1.0, Qt::DashLine);
+    pen.setCosmetic(true);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRect(converter.documentToView(QRectF(m_roiDragStart, m_roiDragEnd).normalized()));
+}
+
+QRectF ToolReferenceImages::decorationsRect() const
+{
+    QRectF result = DefaultTool::decorationsRect();
+    if (m_roiDragging) {
+        const QPointF margin = canvas()->viewConverter()->viewToDocument(QPointF(2.0, 2.0));
+        QRectF roiRect(m_roiDragStart, m_roiDragEnd);
+        roiRect = roiRect.normalized();
+        roiRect.adjust(-margin.x(), -margin.y(), margin.x(), margin.y());
+        result |= roiRect;
+    }
+    return result;
 }
 
 void ToolReferenceImages::slotNodeAdded(KisNodeSP node)
@@ -266,8 +358,35 @@ void ToolReferenceImages::slotSelectionChanged()
     auto layer = m_layer.toStrongRef();
     if (!layer) return;
 
+    cancelRoiCreation();
     m_optionsWidget->selectionChanged(layer->shapeManager()->selection());
     updateActions();
+}
+
+void ToolReferenceImages::beginRoiCreation()
+{
+    if (!selectedEmbeddedReferenceImage()) {
+        return;
+    }
+
+    m_roiCreationMode = true;
+    m_roiDragging = false;
+    m_roiImage = nullptr;
+}
+
+void ToolReferenceImages::clearRoi()
+{
+    KisReferenceImage *reference = selectedEmbeddedReferenceImage();
+    if (!reference || !reference->hasRoi()) {
+        return;
+    }
+
+    if (reference->clearRoi()) {
+        document()->setModified(true);
+    }
+    if (m_optionsWidget && koSelection()) {
+        m_optionsWidget->selectionChanged(koSelection());
+    }
 }
 
 QList<QPointer<QWidget>> ToolReferenceImages::createOptionWidgets()
@@ -304,6 +423,33 @@ KoSelection *ToolReferenceImages::koSelection() const
 {
     auto manager = shapeManager();
     return manager ? manager->selection() : nullptr;
+}
+
+KisReferenceImage *ToolReferenceImages::selectedEmbeddedReferenceImage() const
+{
+    KoSelection *selection = koSelection();
+    if (!selection) {
+        return nullptr;
+    }
+
+    const QList<KoShape*> shapes = selection->selectedEditableShapes();
+    if (shapes.size() != 1) {
+        return nullptr;
+    }
+
+    auto *reference = dynamic_cast<KisReferenceImage*>(shapes.first());
+    return reference && reference->embed() ? reference : nullptr;
+}
+
+void ToolReferenceImages::cancelRoiCreation()
+{
+    const bool hadDrag = m_roiDragging;
+    m_roiCreationMode = false;
+    m_roiDragging = false;
+    m_roiImage = nullptr;
+    if (hadDrag) {
+        repaintDecorations();
+    }
 }
 
 void ToolReferenceImages::updateDistinctiveActions(const QList<KoShape*> &)

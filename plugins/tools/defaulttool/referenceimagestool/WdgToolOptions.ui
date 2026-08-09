@@ -86,6 +86,24 @@
      </item>
     </layout>
    </item>
+   <item>
+    <layout class="QHBoxLayout" name="roiLayout">
+     <item>
+      <widget class="QPushButton" name="bnRoiCreate">
+       <property name="text">
+        <string>ROI create</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="bnRoiClear">
+       <property name="text">
+        <string>ROI clear</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
 
 
 

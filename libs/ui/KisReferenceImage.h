@@ -18,6 +18,7 @@
 class QImage;
 class QPointF;
 class QPainter;
+class QRect;
 class QRectF;
 class KoStore;
 class KisCoordinatesConverter;
@@ -83,6 +84,15 @@ public:
     bool loadImage(KoStore *store);
 
     QImage getImage();
+
+    /**
+     * Restrict the image's alpha channel to a rectangle described by two
+     * document-space points. The first call preserves the original alpha
+     * channel so it can be restored by clearRoi().
+     */
+    bool applyRoi(const QPointF &startDocument, const QPointF &endDocument);
+    bool clearRoi();
+    bool hasRoi() const;
 
 private:
     struct Private;

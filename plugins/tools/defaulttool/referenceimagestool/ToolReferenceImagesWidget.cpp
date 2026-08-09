@@ -65,6 +65,9 @@ ToolReferenceImagesWidget::ToolReferenceImagesWidget(ToolReferenceImages *tool, 
     d->ui->bnDeleteSelectedImages->setIcon(KisIconUtils::loadIcon("edit-delete"));
     d->ui->bnDeleteSelectedImages->setIconSize(QSize(16, 16));
 
+    d->ui->bnRoiCreate->setToolTip(i18n("Create ROI from a drag on the selected reference image"));
+    d->ui->bnRoiClear->setToolTip(i18n("Restore the original alpha channel of the selected reference image"));
+
     d->ui->bnAddReferenceImage->setToolTip(i18n("Add Reference Image From File"));
     d->ui->bnAddReferenceImage->setIcon(KisIconUtils::loadIcon("view-preview"));
     d->ui->bnAddReferenceImage->setIconSize(QSize(16, 16));
@@ -94,6 +97,8 @@ ToolReferenceImagesWidget::ToolReferenceImagesWidget(ToolReferenceImages *tool, 
 
 
 	connect(d->ui->bnDeleteSelectedImages, SIGNAL(clicked()), tool, SLOT(removeSelectedReferenceImages()));
+    connect(d->ui->bnRoiCreate, SIGNAL(clicked()), tool, SLOT(beginRoiCreation()));
+    connect(d->ui->bnRoiClear, SIGNAL(clicked()), tool, SLOT(clearRoi()));
     connect(d->ui->bnAddReferenceImage, SIGNAL(clicked()), tool, SLOT(addReferenceImage()));
     connect(d->ui->bnPasteReferenceImage, SIGNAL(clicked()), tool, SLOT(pasteReferenceImage()));
     connect(d->ui->bnAddReferenceImageFromCurrentLayer, SIGNAL(clicked()), tool, SLOT(addReferenceImageFromLayer()));
@@ -220,10 +225,10 @@ void ToolReferenceImagesWidget::slotSaveLocationChanged(int index)
         if (index == 0) { // embed to KRA
             reference->setEmbed(true);
         } else { // link to file
-            if (reference->hasLocalFile()) {
+            if (reference->hasLocalFile() && !reference->hasRoi()) {
                 reference->setEmbed(false);
             } else {
-                //In the case no local file is found, switch back to embed file data.
+                // ROI alpha backups are stored only for embedded references.
                 d->ui->referenceImageLocationCombobox->setCurrentIndex(0);
             }
         }
@@ -245,6 +250,8 @@ void ToolReferenceImagesWidget::updateVisibility(bool hasSelection)
     d->ui->opacitySlider->setVisible(hasSelection);
     d->ui->saturationSlider->setVisible(hasSelection);
     d->ui->bnDeleteSelectedImages->setVisible(hasSelection);
+    d->ui->bnRoiCreate->setVisible(hasSelection);
+    d->ui->bnRoiClear->setVisible(hasSelection);
 
     // show a label indicating that a selection is required to show options
     d->ui->referenceImageOptionsLabel->setVisible(!hasSelection);
@@ -253,12 +260,14 @@ void ToolReferenceImagesWidget::updateVisibility(bool hasSelection)
         KoSelection* selection = d->tool->koSelection();
         QList<KoShape*> shapes = selection->selectedEditableShapes();
         bool usesLocalFile = true;
+        bool hasRoi = false;
 
         Q_FOREACH(KoShape *shape, shapes) {
             KisReferenceImage *reference = dynamic_cast<KisReferenceImage*>(shape);
 
             if (reference) {
                 usesLocalFile &= reference->hasLocalFile();
+                hasRoi |= reference->hasRoi();
             }
         }
 
@@ -266,8 +275,19 @@ void ToolReferenceImagesWidget::updateVisibility(bool hasSelection)
 
         if (model) {
             QStandardItem* item = model->item(1);
-            item->setFlags(usesLocalFile ? item->flags() | Qt::ItemIsEnabled :
-                                           item->flags() & ~Qt::ItemIsEnabled);
+            item->setFlags(usesLocalFile && !hasRoi ? item->flags() | Qt::ItemIsEnabled :
+                                                      item->flags() & ~Qt::ItemIsEnabled);
         }
+
+        KisReferenceImage *reference = shapes.size() == 1
+                ? dynamic_cast<KisReferenceImage*>(shapes.first())
+                : nullptr;
+        const bool hasSingleEmbeddedReference = reference && reference->embed();
+        d->ui->bnRoiCreate->setEnabled(hasSingleEmbeddedReference);
+        d->ui->bnRoiClear->setEnabled(hasSingleEmbeddedReference &&
+                                      reference->hasRoi());
+    } else {
+        d->ui->bnRoiCreate->setEnabled(false);
+        d->ui->bnRoiClear->setEnabled(false);
     }
 }

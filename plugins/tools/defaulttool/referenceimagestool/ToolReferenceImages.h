@@ -8,6 +8,8 @@
 #define TOOL_REFERENCE_IMAGES_H
 
 #include <QPointer>
+#include <QPointF>
+#include <QRectF>
 
 #include <KoToolFactoryBase.h>
 #include <KoIcon.h>
@@ -21,7 +23,9 @@
 #include <defaulttool/DefaultToolFactory.h>
 
 class ToolReferenceImagesWidget;
+class KisReferenceImage;
 class KisReferenceImagesLayer;
+class QPainter;
 
 class ToolReferenceImages : public DefaultTool
 {
@@ -36,6 +40,11 @@ public:
     }
 
     void mouseDoubleClickEvent(KoPointerEvent */*event*/) override {}
+    void mousePressEvent(KoPointerEvent *event) override;
+    void mouseMoveEvent(KoPointerEvent *event) override;
+    void mouseReleaseEvent(KoPointerEvent *event) override;
+    void paint(QPainter &painter, const KoViewConverter &converter) override;
+    QRectF decorationsRect() const override;
 
     bool hasSelection() override;
 
@@ -65,6 +74,8 @@ public Q_SLOTS:
     void removeAllReferenceImages();
     void saveReferenceImages();
     void loadReferenceImages();
+    void beginRoiCreation();
+    void clearRoi();
 
     void slotNodeAdded(KisNodeSP node);
     void slotNodeAdded(KisNodeSP node, KisNodeAdditionFlags flags);
@@ -82,9 +93,16 @@ private:
     friend class ToolReferenceImagesWidget;
     ToolReferenceImagesWidget *m_optionsWidget = nullptr;
     KisWeakSharedPtr<KisReferenceImagesLayer> m_layer;
+    KisReferenceImage *m_roiImage = nullptr;
+    QPointF m_roiDragStart;
+    QPointF m_roiDragEnd;
+    bool m_roiCreationMode = false;
+    bool m_roiDragging = false;
 
     KisDocument *document() const;
     void setReferenceImageLayer(KisSharedPtr<KisReferenceImagesLayer> layer);
+    KisReferenceImage *selectedEmbeddedReferenceImage() const;
+    void cancelRoiCreation();
 };
 
 
@@ -113,4 +131,3 @@ public:
 
 
 #endif
-
