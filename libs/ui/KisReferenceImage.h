@@ -86,11 +86,11 @@ public:
     QImage getImage();
 
     /**
-     * Restrict the image's alpha channel to a rectangle described by two
-     * document-space points. The first call preserves the original alpha
-     * channel so it can be restored by clearRoi().
+     * Restrict the image's alpha channel to an image-shape-local rectangle.
+     * The first call preserves the original alpha channel so it can be
+     * restored by clearRoi().
      */
-    bool applyRoi(const QPointF &startDocument, const QPointF &endDocument);
+    bool applyRoi(const QRectF &shapeRect);
     bool clearRoi();
     bool hasRoi() const;
 

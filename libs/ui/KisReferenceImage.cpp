@@ -510,26 +510,19 @@ QImage KisReferenceImage::getImage()
     return d->image;
 }
 
-bool KisReferenceImage::applyRoi(const QPointF &startDocument, const QPointF &endDocument)
+bool KisReferenceImage::applyRoi(const QRectF &shapeRect)
 {
     if (d->image.isNull() || size().isEmpty()) {
         return false;
     }
 
-    bool invertible = false;
-    const QTransform inverseTransform = absoluteTransformation().inverted(&invertible);
-    if (!invertible) {
-        return false;
-    }
-
-    const QPointF startLocal = inverseTransform.map(startDocument);
-    const QPointF endLocal = inverseTransform.map(endDocument);
     const QSizeF shapeSize = size();
-    const QPointF startPixel(startLocal.x() * d->image.width() / shapeSize.width(),
-                             startLocal.y() * d->image.height() / shapeSize.height());
-    const QPointF endPixel(endLocal.x() * d->image.width() / shapeSize.width(),
-                           endLocal.y() * d->image.height() / shapeSize.height());
-    const QRect roi = QRectF(startPixel, endPixel).normalized().toAlignedRect().intersected(d->image.rect());
+    const QRectF normalizedShapeRect = shapeRect.normalized();
+    const QRectF pixelRect(normalizedShapeRect.x() * d->image.width() / shapeSize.width(),
+                           normalizedShapeRect.y() * d->image.height() / shapeSize.height(),
+                           normalizedShapeRect.width() * d->image.width() / shapeSize.width(),
+                           normalizedShapeRect.height() * d->image.height() / shapeSize.height());
+    const QRect roi = pixelRect.toAlignedRect().intersected(d->image.rect());
 
     if (roi.isEmpty()) {
         return false;

@@ -79,8 +79,8 @@ void ToolReferenceImages::mousePressEvent(KoPointerEvent *event)
             return;
         }
 
-        m_roiDragStart = event->point;
-        m_roiDragEnd = event->point;
+        m_roiDragStart = m_roiImage->documentToShape(event->point);
+        m_roiDragEnd = m_roiDragStart;
         m_roiDragging = true;
         event->accept();
         repaintDecorations();
@@ -93,7 +93,7 @@ void ToolReferenceImages::mousePressEvent(KoPointerEvent *event)
 void ToolReferenceImages::mouseMoveEvent(KoPointerEvent *event)
 {
     if (m_roiDragging) {
-        m_roiDragEnd = event->point;
+        m_roiDragEnd = m_roiImage->documentToShape(event->point);
         event->accept();
         repaintDecorations();
         return;
@@ -105,7 +105,7 @@ void ToolReferenceImages::mouseMoveEvent(KoPointerEvent *event)
 void ToolReferenceImages::mouseReleaseEvent(KoPointerEvent *event)
 {
     if (m_roiDragging && (event->button() & Qt::LeftButton)) {
-        m_roiDragEnd = event->point;
+        m_roiDragEnd = m_roiImage->documentToShape(event->point);
         KisReferenceImage *reference = selectedEmbeddedReferenceImage();
         const bool appliesToOriginalSelection = reference && reference == m_roiImage;
         m_roiDragging = false;
@@ -113,7 +113,7 @@ void ToolReferenceImages::mouseReleaseEvent(KoPointerEvent *event)
         m_roiImage = nullptr;
 
         if (appliesToOriginalSelection) {
-            if (reference->applyRoi(m_roiDragStart, m_roiDragEnd)) {
+            if (reference->applyRoi(QRectF(m_roiDragStart, m_roiDragEnd))) {
                 document()->setModified(true);
             }
         }
@@ -138,11 +138,19 @@ void ToolReferenceImages::paint(QPainter &painter, const KoViewConverter &conver
         return;
     }
 
+    const QRectF roiRect(m_roiDragStart, m_roiDragEnd);
+
+    painter.save();
+    painter.setTransform(m_roiImage->absoluteTransformation() *
+                         converter.documentToView() *
+                         painter.transform());
+
     QPen pen(QColor(8, 60, 167, 204), 1.0, Qt::DashLine);
     pen.setCosmetic(true);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
-    painter.drawRect(converter.documentToView(QRectF(m_roiDragStart, m_roiDragEnd).normalized()));
+    painter.drawRect(roiRect.normalized());
+    painter.restore();
 }
 
 QRectF ToolReferenceImages::decorationsRect() const
@@ -150,8 +158,7 @@ QRectF ToolReferenceImages::decorationsRect() const
     QRectF result = DefaultTool::decorationsRect();
     if (m_roiDragging) {
         const QPointF margin = canvas()->viewConverter()->viewToDocument(QPointF(2.0, 2.0));
-        QRectF roiRect(m_roiDragStart, m_roiDragEnd);
-        roiRect = roiRect.normalized();
+        QRectF roiRect = m_roiImage->shapeToDocument(QRectF(m_roiDragStart, m_roiDragEnd).normalized());
         roiRect.adjust(-margin.x(), -margin.y(), margin.x(), margin.y());
         result |= roiRect;
     }
