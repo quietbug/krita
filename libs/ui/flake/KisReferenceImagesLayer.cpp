@@ -241,8 +241,9 @@ void KisReferenceImagesLayer::paintReferencesInWidget(QPainter &painter)
 
 bool KisReferenceImagesLayer::hasPinnedReferences() const
 {
-    Q_FOREACH (KisReferenceImage *reference, referenceImages()) {
-        if (reference->pinned()) {
+    Q_FOREACH (KoShape *shape, shapes()) {
+        KisReferenceImage *reference = dynamic_cast<KisReferenceImage*>(shape);
+        if (reference && reference->pinned()) {
             return true;
         }
     }

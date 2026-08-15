@@ -42,7 +42,6 @@ private Q_SLOTS:
     void slotNodeRemoved(KisNodeSP);
     void slotLayersChanged();
     void slotReferenceImagesChanged(const QRectF &dirtyRect);
-    void slotCanvasStateChanged();
 
 protected:
     void drawDecoration(QPainter& gc, const QRectF& updateRect, const KisCoordinatesConverter *converter, KisCanvas2* canvas) override;

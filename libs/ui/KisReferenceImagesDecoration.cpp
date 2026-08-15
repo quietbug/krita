@@ -30,6 +30,7 @@ struct KisReferenceImagesDecoration::Private {
 
     KisWeakSharedPtr<KisReferenceImagesLayer> layer;
     Buffer buffer;
+    Buffer pinnedBuffer;
     QTransform previousTransform;
     QSizeF previousViewSize;
 
@@ -49,6 +50,25 @@ struct KisReferenceImagesDecoration::Private {
         updateBuffer(dirtyWidgetRect, dirtyImageRect);
     }
 
+    void updatePinnedBuffer()
+    {
+        const QRectF widgetRect(QPointF(0, 0), q->view()->size());
+        if (widgetRect.isEmpty()) {
+            return;
+        }
+
+        const qreal devicePixelRatioF = q->view()->devicePixelRatioF();
+        pinnedBuffer.position = widgetRect.topLeft();
+        pinnedBuffer.image = QImage((widgetRect.size() * devicePixelRatioF).toSize(), QImage::Format_ARGB32);
+        pinnedBuffer.image.setDevicePixelRatio(devicePixelRatioF);
+
+        QPainter gc(&pinnedBuffer.image);
+        gc.setCompositionMode(QPainter::CompositionMode_Source);
+        gc.fillRect(widgetRect, Qt::transparent);
+        gc.setClipRect(widgetRect);
+        layer->paintReferencesInWidget(gc);
+    }
+
 private:
     void updateBuffer(QRectF widgetRect, QRectF imageRect)
     {
@@ -57,13 +77,9 @@ private:
 
         qreal devicePixelRatioF = q->view()->devicePixelRatioF();
         if (buffer.image.isNull() || !buffer.bounds().contains(widgetRect)) {
-            if (layer->hasPinnedReferences()) {
-                widgetRect = QRectF(QPointF(0, 0), q->view()->size());
-            } else {
-                const QRectF boundingImageRect = layer->boundingImageRect();
-                const QRectF boundingWidgetRect = q->view()->viewConverter()->imageToWidget(boundingImageRect);
-                widgetRect = boundingWidgetRect.intersected(q->view()->rect());
-            }
+            const QRectF boundingImageRect = layer->boundingImageRect();
+            const QRectF boundingWidgetRect = q->view()->viewConverter()->imageToWidget(boundingImageRect);
+            widgetRect = boundingWidgetRect.intersected(q->view()->rect());
 
             if (widgetRect.isNull()) return;
 
@@ -102,11 +118,6 @@ KisReferenceImagesDecoration::KisReferenceImagesDecoration(QPointer<KisView> par
     connect(document->image().data(), SIGNAL(sigRemoveNodeAsync(KisNodeSP)), this, SLOT(slotNodeRemoved(KisNodeSP)));
     connect(document->image().data(), SIGNAL(sigLayersChangedAsync()), this, SLOT(slotLayersChanged()));
     connect(document, &KisDocument::sigReferenceImagesLayerChanged, this, qOverload<KisNodeSP>(&KisReferenceImagesDecoration::slotNodeAdded));
-    if (parent && parent->canvasBase()) {
-        connect(parent->canvasBase(), &KisCanvas2::sigCanvasStateChanged,
-                this, &KisReferenceImagesDecoration::slotCanvasStateChanged);
-    }
-
     auto referenceImageLayer = document->referenceImagesLayer();
     if (referenceImageLayer) {
         setReferenceImageLayer(referenceImageLayer, /* updateCanvas = */ viewReady);
@@ -149,19 +160,14 @@ void KisReferenceImagesDecoration::drawDecoration(QPainter &gc, const QRectF &/*
         }
 
         if (layer->hasPinnedReferences()) {
-            layer->paintReferencesInWidget(gc);
+            if (d->pinnedBuffer.image.isNull()) {
+                d->updatePinnedBuffer();
+            }
+            if (!d->pinnedBuffer.image.isNull()) {
+                gc.drawImage(d->pinnedBuffer.position, d->pinnedBuffer.image);
+            }
         }
     }
-}
-
-void KisReferenceImagesDecoration::slotCanvasStateChanged()
-{
-    if (!d->layer.toStrongRef() || !d->layer.toStrongRef()->hasPinnedReferences()) {
-        return;
-    }
-
-    d->buffer.image = QImage();
-    view()->canvasBase()->updateCanvasDecorations();
 }
 
 void KisReferenceImagesDecoration::slotNodeAdded(KisNodeSP node)
@@ -205,7 +211,8 @@ void KisReferenceImagesDecoration::slotReferenceImagesChanged(const QRectF &dirt
 {
     if (d->layer.toStrongRef() && d->layer.toStrongRef()->hasPinnedReferences()) {
         d->buffer.image = QImage();
-        d->updateBufferByWidgetCoordinates(QRectF(QPointF(0, 0), view()->size()));
+        d->pinnedBuffer.image = QImage();
+        d->updateBufferByImageCoordinates(dirtyRect);
     } else {
         d->updateBufferByImageCoordinates(dirtyRect);
     }
@@ -227,6 +234,8 @@ void KisReferenceImagesDecoration::setReferenceImageLayer(KisSharedPtr<KisRefere
         }
 
         d->layer = layer;
+        d->buffer.image = QImage();
+        d->pinnedBuffer.image = QImage();
 
         if (layer) {
             connect(layer.data(), SIGNAL(sigUpdateCanvas(QRectF)),
