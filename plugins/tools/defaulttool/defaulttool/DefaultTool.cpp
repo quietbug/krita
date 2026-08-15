@@ -1106,6 +1106,22 @@ void DefaultTool::updateCursor()
 
 void DefaultTool::paint(QPainter &painter, const KoViewConverter &converter)
 {
+    paintSelectionDecorations(painter, converter);
+
+    m_textOutlineHelper->setHandleRadius(handleRadius());
+    m_textOutlineHelper->setDecorationThickness(decorationThickness());
+    m_textOutlineHelper->paint(&painter, converter);
+
+    KoInteractionTool::paint(painter, converter);
+
+    painter.save();
+    painter.setTransform(converter.documentToView(), true);
+    canvas()->snapGuide()->paint(painter, converter);
+    painter.restore();
+}
+
+void DefaultTool::paintSelectionDecorations(QPainter &painter, const KoViewConverter &converter)
+{
     KoSelection *selection = koSelection();
     if (selection) {
         m_decorator.reset(new SelectionDecorator(canvas()->resourceManager()));
@@ -1133,17 +1149,6 @@ void DefaultTool::paint(QPainter &painter, const KoViewConverter &converter)
         m_decorator->setCurrentMeshGradientHandles(m_selectedMeshHandle, m_hoveredMeshHandle);
         m_decorator->paint(painter, converter);
     }
-
-    m_textOutlineHelper->setHandleRadius(handleRadius());
-    m_textOutlineHelper->setDecorationThickness(decorationThickness());
-    m_textOutlineHelper->paint(&painter, converter);
-
-    KoInteractionTool::paint(painter, converter);
-
-    painter.save();
-    painter.setTransform(converter.documentToView(), true);
-    canvas()->snapGuide()->paint(painter, converter);
-    painter.restore();
 }
 
 bool DefaultTool::isValidForCurrentLayer() const
@@ -1157,6 +1162,11 @@ bool DefaultTool::isValidForCurrentLayer() const
 
 KoShapeManager *DefaultTool::shapeManager() const {
     return canvas()->shapeManager();
+}
+
+KoShape *DefaultTool::shapeAt(const QPointF &documentPoint, KoFlake::ShapeSelection selection) const
+{
+    return shapeManager()->shapeAt(documentPoint, selection);
 }
 
 void DefaultTool::mousePressEvent(KoPointerEvent *event)
@@ -1238,7 +1248,7 @@ void DefaultTool::mouseDoubleClickEvent(KoPointerEvent *event)
 {
     KoSelection *selection = koSelection();
 
-    KoShape *shape = shapeManager()->shapeAt(event->point, KoFlake::ShapeOnTop);
+    KoShape *shape = shapeAt(event->point, KoFlake::ShapeOnTop);
     if (shape && selection && !selection->isSelected(shape)) {
 
         if (!(event->modifiers() & Qt::ShiftModifier)) {
@@ -2077,7 +2087,7 @@ KoInteractionStrategy *DefaultTool::createStrategy(KoPointerEvent *event)
         }
     }
 
-    KoShape *shape = shapeManager()->shapeAt(event->point, selectNextInStack ? KoFlake::NextUnselected : KoFlake::ShapeOnTop);
+    KoShape *shape = shapeAt(event->point, selectNextInStack ? KoFlake::NextUnselected : KoFlake::ShapeOnTop);
 
     if (avoidSelection || (!shape && handle == KoFlake::NoHandle)) {
         if (!selectMultiple) {

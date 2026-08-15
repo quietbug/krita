@@ -15,6 +15,8 @@
 #include <kritaui_export.h>
 #include <kundo2command.h>
 
+#include <QTransform>
+
 class QImage;
 class QPointF;
 class QPainter;
@@ -30,6 +32,20 @@ class KisCanvas2;
 class KRITAUI_EXPORT KisReferenceImage : public KoShape
 {
 public:
+    struct KRITAUI_EXPORT SetPinnedCommand : public KUndo2Command {
+        KisReferenceImage *image;
+        bool oldPinned;
+        bool newPinned;
+        QTransform oldTransform;
+        QTransform newTransform;
+
+        SetPinnedCommand(KisReferenceImage *image, bool pinned,
+                         const QTransform &viewTransform,
+                         KUndo2Command *parent = nullptr);
+        void undo() override;
+        void redo() override;
+    };
+
     struct KRITAUI_EXPORT SetSaturationCommand : public KUndo2Command {
         QVector<KisReferenceImage*> images;
         QVector<qreal> oldSaturations;
@@ -64,6 +80,12 @@ public:
 
     void setSaturation(qreal saturation);
     qreal saturation() const;
+
+    bool pinned() const;
+    void setPinned(bool pinned);
+    void setPinnedState(bool pinned, const QTransform &shapeTransform);
+    void convertTransformToViewport(const QTransform &viewTransform);
+    void convertTransformToDocument(const QTransform &viewTransform);
 
     void setEmbed(bool embed);
     bool embed();

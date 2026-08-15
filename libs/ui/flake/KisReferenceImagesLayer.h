@@ -8,6 +8,7 @@
 #define KRITA_KISREFERENCEIMAGESLAYER_H
 
 #include "kis_shape_layer.h"
+#include <KoFlake.h>
 
 #include <kis_types.h>
 
@@ -25,11 +26,15 @@ public:
     static KUndo2Command * addReferenceImages(KisDocument *document, QList<KoShape*> referenceImages);
     KUndo2Command * removeReferenceImages(KisDocument *document, QList<KoShape*> referenceImages);
     QVector<KisReferenceImage*> referenceImages() const;
+    bool hasPinnedReferences() const;
+    KoShape *shapeAt(const QPointF &documentPoint, const QPointF &viewPoint,
+                     KoFlake::ShapeSelection selection = KoFlake::ShapeOnTop) const;
 
     QRectF boundingImageRect() const;
     QColor getPixel(QPointF position) const;
 
     void paintReferences(QPainter &painter);
+    void paintReferencesInWidget(QPainter &painter);
 
     bool allowAsChild(KisNodeSP) const override;
 

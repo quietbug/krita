@@ -17,6 +17,9 @@
 #include "KisReferenceImage.h"
 #include "KisDocument.h"
 #include <KoViewConverter.h>
+#include <kis_coordinates_converter.h>
+
+#include <algorithm>
 
 struct AddReferenceImagesCommand : KoShapeCreateCommand
 {
@@ -201,8 +204,114 @@ QVector<KisReferenceImage*> KisReferenceImagesLayer::referenceImages() const
 }
 
 void KisReferenceImagesLayer::paintReferences(QPainter &painter) {
-    painter.setTransform(converter()->documentToView(), true);
-    shapeManager()->paint(painter);
+    QList<KoShape*> sortedShapes = shapes();
+    std::sort(sortedShapes.begin(), sortedShapes.end(), KoShape::compareShapeZIndex);
+
+    const QTransform baseTransform = painter.transform();
+    const QTransform documentToView = converter()->documentToView();
+
+    for (KoShape *shape : sortedShapes) {
+        auto *reference = dynamic_cast<KisReferenceImage*>(shape);
+        if (!reference) {
+            continue;
+        }
+
+        painter.setTransform(baseTransform);
+        if (!reference->pinned()) {
+            painter.setTransform(documentToView, true);
+        }
+        shapeManager()->renderSingleShape(reference, painter);
+    }
+}
+
+void KisReferenceImagesLayer::paintReferencesInWidget(QPainter &painter)
+{
+    QList<KoShape*> sortedShapes = shapes();
+    std::sort(sortedShapes.begin(), sortedShapes.end(), KoShape::compareShapeZIndex);
+
+    const QTransform baseTransform = painter.transform();
+    const auto *coordinatesConverter = dynamic_cast<const KisCoordinatesConverter*>(converter());
+    const QTransform documentToWidget = coordinatesConverter
+            ? coordinatesConverter->documentToWidgetTransform()
+            : converter()->viewToWidget() * converter()->documentToView();
+
+    for (KoShape *shape : sortedShapes) {
+        auto *reference = dynamic_cast<KisReferenceImage*>(shape);
+        if (!reference) {
+            continue;
+        }
+
+        painter.setTransform(baseTransform);
+        if (!reference->pinned()) {
+            painter.setTransform(documentToWidget, true);
+        }
+        shapeManager()->renderSingleShape(reference, painter);
+    }
+}
+
+bool KisReferenceImagesLayer::hasPinnedReferences() const
+{
+    Q_FOREACH (KisReferenceImage *reference, referenceImages()) {
+        if (reference->pinned()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+KoShape *KisReferenceImagesLayer::shapeAt(const QPointF &documentPoint,
+                                          const QPointF &widgetPoint,
+                                          KoFlake::ShapeSelection selection) const
+{
+    QList<KoShape*> sortedShapes = shapes();
+    std::sort(sortedShapes.begin(), sortedShapes.end(), KoShape::compareShapeZIndex);
+
+    KoShape *firstUnselectedShape = nullptr;
+    KoSelection *shapeSelection = shapeManager()->selection();
+
+    for (auto it = sortedShapes.crbegin(); it != sortedShapes.crend(); ++it) {
+        KoShape *shape = *it;
+        auto *reference = dynamic_cast<KisReferenceImage*>(shape);
+        if (!reference || !reference->isVisible() ||
+            !reference->hitTest(reference->pinned()
+                                     ? widgetPoint
+                                     : documentPoint)) {
+            continue;
+        }
+
+        const bool selected = shapeSelection && shapeSelection->isSelected(shape);
+        switch (selection) {
+        case KoFlake::ShapeOnTop:
+            if (shape->isSelectable()) {
+                return shape;
+            }
+            break;
+        case KoFlake::Selected:
+            if (selected) {
+                return shape;
+            }
+            break;
+        case KoFlake::Unselected:
+            if (!selected) {
+                return shape;
+            }
+            break;
+        case KoFlake::NextUnselected:
+            if (selected) {
+                continue;
+            }
+            if (!firstUnselectedShape) {
+                firstUnselectedShape = shape;
+            }
+            if (it + 1 != sortedShapes.crend() && shapeSelection &&
+                shapeSelection->isSelected(*(it + 1))) {
+                return shape;
+            }
+            break;
+        }
+    }
+
+    return selection == KoFlake::NextUnselected ? firstUnselectedShape : nullptr;
 }
 
 bool KisReferenceImagesLayer::allowAsChild(KisNodeSP) const
@@ -248,20 +357,25 @@ void KisReferenceImagesLayer::signalUpdate(const QRectF &rect)
 
 QRectF KisReferenceImagesLayer::boundingImageRect() const
 {
-    return converter()->documentToView(boundingRect());
+    QRectF result;
+    Q_FOREACH (KisReferenceImage *reference, referenceImages()) {
+        if (!reference->pinned()) {
+            result |= converter()->documentToView(reference->boundingRect());
+        }
+    }
+    return result;
 }
 
 QColor KisReferenceImagesLayer::getPixel(QPointF position) const
 {
     const QPointF docPoint = converter()->viewToDocument(position);
-
-    KoShape *shape = shapeManager()->shapeAt(docPoint);
+    KoShape *shape = shapeAt(docPoint, converter()->viewToWidget().map(position));
 
     if (shape) {
         auto *reference = dynamic_cast<KisReferenceImage*>(shape);
         KIS_SAFE_ASSERT_RECOVER_RETURN_VALUE(reference, QColor());
 
-        return reference->getPixel(docPoint);
+        return reference->getPixel(reference->pinned() ? converter()->viewToWidget().map(position) : docPoint);
     }
 
     return QColor();

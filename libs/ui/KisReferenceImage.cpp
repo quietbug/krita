@@ -53,6 +53,7 @@ struct KisReferenceImage::Private : public QSharedData
     qreal saturation{1.0};
     int id{-1};
     bool embed{true};
+    bool pinned{false};
 
     bool loadFromFile() {
         KIS_SAFE_ASSERT_RECOVER_RETURN_VALUE(!externalFilename.isEmpty(), false);
@@ -147,6 +148,36 @@ struct KisReferenceImage::Private : public QSharedData
         return true;
     }
 };
+
+KisReferenceImage::SetPinnedCommand::SetPinnedCommand(KisReferenceImage *image, bool pinned,
+                                                       const QTransform &viewTransform,
+                                                       KUndo2Command *parent)
+    : KUndo2Command(kundo2_i18n("Pin reference image to viewport"), parent)
+    , image(image)
+    , oldPinned(image->pinned())
+    , newPinned(pinned)
+    , oldTransform(image->transformation())
+    , newTransform(image->transformation())
+{
+    if (oldPinned != newPinned) {
+        newTransform = newPinned
+                ? oldTransform * viewTransform
+                : oldTransform * viewTransform.inverted();
+    }
+    if (!newPinned) {
+        setText(kundo2_i18n("Unpin reference image from viewport"));
+    }
+}
+
+void KisReferenceImage::SetPinnedCommand::undo()
+{
+    image->setPinnedState(oldPinned, oldTransform);
+}
+
+void KisReferenceImage::SetPinnedCommand::redo()
+{
+    image->setPinnedState(newPinned, newTransform);
+}
 
 
 KisReferenceImage::SetSaturationCommand::SetSaturationCommand(const QList<KoShape *> &shapes, qreal newSaturation, KUndo2Command *parent)
@@ -308,6 +339,32 @@ void KisReferenceImage::setSaturation(qreal saturation)
 qreal KisReferenceImage::saturation() const
 {
     return d->saturation;
+}
+
+bool KisReferenceImage::pinned() const
+{
+    return d->pinned;
+}
+
+void KisReferenceImage::setPinned(bool pinned)
+{
+    d->pinned = pinned;
+}
+
+void KisReferenceImage::setPinnedState(bool pinned, const QTransform &shapeTransform)
+{
+    setTransformation(shapeTransform);
+    setPinned(pinned);
+}
+
+void KisReferenceImage::convertTransformToViewport(const QTransform &viewTransform)
+{
+    setTransformation(transformation() * viewTransform);
+}
+
+void KisReferenceImage::convertTransformToDocument(const QTransform &viewTransform)
+{
+    setTransformation(transformation() * viewTransform.inverted());
 }
 
 void KisReferenceImage::setEmbed(bool embed)

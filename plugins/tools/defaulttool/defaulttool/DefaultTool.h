@@ -156,6 +156,9 @@ protected:
     virtual bool isValidForCurrentLayer() const;
     virtual KoShapeManager *shapeManager() const;
     virtual KoSelection *koSelection() const;
+    virtual KoShape *shapeAt(const QPointF &documentPoint,
+                             KoFlake::ShapeSelection selection = KoFlake::ShapeOnTop) const;
+    virtual void paintSelectionDecorations(QPainter &painter, const KoViewConverter &converter);
 
     /**
      * Enable/disable actions specific to the tool (vector vs. reference images)

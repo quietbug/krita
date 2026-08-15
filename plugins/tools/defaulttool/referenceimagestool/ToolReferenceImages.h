@@ -26,6 +26,7 @@ class ToolReferenceImagesWidget;
 class KisReferenceImage;
 class KisReferenceImagesLayer;
 class QPainter;
+class QAction;
 
 class ToolReferenceImages : public DefaultTool
 {
@@ -59,6 +60,10 @@ protected:
     bool isValidForCurrentLayer() const override;
     KoShapeManager *shapeManager() const override;
     KoSelection *koSelection() const override;
+    KoShape *shapeAt(const QPointF &documentPoint,
+                     KoFlake::ShapeSelection selection = KoFlake::ShapeOnTop) const override;
+    void paintSelectionDecorations(QPainter &painter, const KoViewConverter &converter) override;
+    KoInteractionStrategy *createStrategy(KoPointerEvent *event) override;
 
     void updateDistinctiveActions(const QList<KoShape*> &editableShapes) override;
 
@@ -80,6 +85,7 @@ public Q_SLOTS:
     void slotNodeAdded(KisNodeSP node);
     void slotNodeAdded(KisNodeSP node, KisNodeAdditionFlags flags);
     void slotSelectionChanged();
+    void toggleSelectedReferencePinned();
 
     void cut() override;
     void copy() const override;
@@ -92,6 +98,7 @@ public Q_SLOTS:
 private:
     friend class ToolReferenceImagesWidget;
     ToolReferenceImagesWidget *m_optionsWidget = nullptr;
+    QAction *m_pinAction = nullptr;
     KisWeakSharedPtr<KisReferenceImagesLayer> m_layer;
     KisReferenceImage *m_roiImage = nullptr;
     QPointF m_roiDragStart;
@@ -102,6 +109,7 @@ private:
     KisDocument *document() const;
     void setReferenceImageLayer(KisSharedPtr<KisReferenceImagesLayer> layer);
     KisReferenceImage *selectedEmbeddedReferenceImage() const;
+    KisReferenceImage *selectedReferenceImage() const;
     void cancelRoiCreation();
 };
 
