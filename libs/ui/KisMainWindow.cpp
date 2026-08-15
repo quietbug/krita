@@ -47,6 +47,9 @@
 #include <QTemporaryDir>
 #include <QScrollArea>
 #include <QActionGroup>
+#include <QDateTime>
+#include <QDir>
+#include <QFileInfo>
 
 #include <kactioncollection.h>
 #include <kactionmenu.h>
@@ -116,6 +119,7 @@
 #include "kis_clipboard.h"
 #include "kis_config.h"
 #include "kis_config_notifier.h"
+#include "kis_properties_configuration.h"
 #include "kis_custom_image_widget.h"
 #include "animation/KisAnimationRender.h"
 #include "animation/KisDlgAnimationRenderer.h"
@@ -236,6 +240,8 @@ public:
     KisAction *showDocumentInfo {nullptr};
     KisAction *saveAction {nullptr};
     KisAction *saveActionAs {nullptr};
+    KisAction *quickSaveAction {nullptr};
+    KisAction *quickExportAction {nullptr};
     KisAction *importAnimation {nullptr};
     KisAction *importVideoAnimation {nullptr};
     KisAction *renderAnimation {nullptr};
@@ -304,6 +310,10 @@ public:
     QByteArray lastExportedFormat;
     QScopedPointer<KisSignalCompressorWithParam<int> > tabSwitchCompressor;
     QMutex savingEntryMutex;
+
+    QPointer<KisDocument> quickActionDocument;
+    QString quickActionPath;
+    bool quickActionIsSave {false};
 
     KConfigGroup windowStateConfig;
 
@@ -1823,6 +1833,160 @@ void KisMainWindow::slotFileSave()
     }
 }
 
+namespace {
+
+QString quickActionFilePath(const QString &configuredDirectory, const QString &extension)
+{
+    const QString directory = configuredDirectory.isEmpty()
+            ? QDir::currentPath()
+            : QDir::cleanPath(configuredDirectory);
+    const QString filename = QString::number(QDateTime::currentSecsSinceEpoch()) + "." + extension;
+    return QDir(directory).filePath(filename);
+}
+
+}
+
+void KisMainWindow::slotQuickSave()
+{
+    if (d->quickActionDocument && !d->quickActionDocument->isSaving()) {
+        clearQuickActionState();
+    }
+
+    KisDocument *document = d->activeView ? d->activeView->document() : nullptr;
+    if (!document || d->quickActionDocument) {
+        return;
+    }
+
+    KisConfig config(true);
+    const QString path = quickActionFilePath(config.quickSaveDirectory(), "kra");
+    const QFileInfo fileInfo(path);
+    QDir directory(fileInfo.absolutePath());
+
+    if (!directory.exists() && !directory.mkpath(".")) {
+        QMessageBox::critical(this, i18nc("@title:window", "Quick Save"),
+                              i18n("Could not create the quick save directory:\n%1", directory.absolutePath()));
+        return;
+    }
+    if (fileInfo.exists()) {
+        QMessageBox::critical(this, i18nc("@title:window", "Quick Save"),
+                              i18n("The quick save file already exists:\n%1", path));
+        return;
+    }
+
+    d->quickActionDocument = document;
+    d->quickActionPath = path;
+    d->quickActionIsSave = true;
+    connect(document, SIGNAL(completed()), this, SLOT(slotQuickActionCompleted()), Qt::UniqueConnection);
+    connect(document, SIGNAL(canceled(QString)), this, SLOT(slotQuickActionCanceled(QString)), Qt::UniqueConnection);
+
+    if (!document->saveAs(path, KisDocument::nativeFormatMimeType(), true)) {
+        slotQuickActionCanceled(document->errorMessage());
+    }
+}
+
+void KisMainWindow::slotQuickExport()
+{
+    if (d->quickActionDocument && !d->quickActionDocument->isSaving()) {
+        clearQuickActionState();
+    }
+
+    KisDocument *document = d->activeView ? d->activeView->document() : nullptr;
+    if (!document || d->quickActionDocument) {
+        return;
+    }
+
+    KisConfig config(true);
+    const QString path = quickActionFilePath(config.quickExportDirectory(), "png");
+    const QFileInfo fileInfo(path);
+    QDir directory(fileInfo.absolutePath());
+
+    if (!directory.exists() && !directory.mkpath(".")) {
+        QMessageBox::critical(this, i18nc("@title:window", "Quick Export"),
+                              i18n("Could not create the quick export directory:\n%1", directory.absolutePath()));
+        return;
+    }
+    if (fileInfo.exists()) {
+        QMessageBox::critical(this, i18nc("@title:window", "Quick Export"),
+                              i18n("The quick export file already exists:\n%1", path));
+        return;
+    }
+
+    KisPropertiesConfigurationSP exportConfiguration(new KisPropertiesConfiguration());
+    exportConfiguration->setProperty("alpha", true);
+    exportConfiguration->setProperty("indexed", false);
+    exportConfiguration->setProperty("compression", 1);
+    exportConfiguration->setProperty("interlaced", false);
+    exportConfiguration->setProperty("forceSRGB", true);
+    exportConfiguration->setProperty("downsample", true);
+    exportConfiguration->setProperty("saveAsHDR", false);
+
+    d->quickActionDocument = document;
+    d->quickActionPath = path;
+    d->quickActionIsSave = false;
+    connect(document, SIGNAL(completed()), this, SLOT(slotQuickActionCompleted()), Qt::UniqueConnection);
+    connect(document, SIGNAL(canceled(QString)), this, SLOT(slotQuickActionCanceled(QString)), Qt::UniqueConnection);
+
+    if (!document->exportDocument(path, QByteArrayLiteral("image/png"), false, false, exportConfiguration)) {
+        slotQuickActionCanceled(document->errorMessage());
+    }
+}
+
+void KisMainWindow::slotQuickActionCompleted()
+{
+    KisDocument *document = d->quickActionDocument.data();
+    if (!document) {
+        return;
+    }
+
+    const QString path = d->quickActionPath;
+    const bool isSave = d->quickActionIsSave;
+    disconnect(document, SIGNAL(completed()), this, SLOT(slotQuickActionCompleted()));
+    disconnect(document, SIGNAL(canceled(QString)), this, SLOT(slotQuickActionCanceled(QString)));
+    d->quickActionDocument.clear();
+    d->quickActionPath.clear();
+
+    if (isSave) {
+        KisPart::instance()->queueAddRecentURLToAllMainWindowsOnFileSaved(QUrl::fromLocalFile(path));
+        Q_EMIT documentSaved();
+    }
+
+    const QString message = isSave
+            ? i18n("Quick Save successful:\n%1", path)
+            : i18n("Quick Export successful:\n%1", path);
+    viewManager()->showFloatingMessage(message, QIcon());
+}
+
+void KisMainWindow::slotQuickActionCanceled(const QString &error)
+{
+    KisDocument *document = d->quickActionDocument.data();
+    if (!document) {
+        return;
+    }
+
+    const QString path = d->quickActionPath;
+    const QString title = d->quickActionIsSave ? i18nc("@title:window", "Quick Save")
+                                                : i18nc("@title:window", "Quick Export");
+    disconnect(document, SIGNAL(completed()), this, SLOT(slotQuickActionCompleted()));
+    disconnect(document, SIGNAL(canceled(QString)), this, SLOT(slotQuickActionCanceled(QString)));
+    d->quickActionDocument.clear();
+    d->quickActionPath.clear();
+
+    QMessageBox::critical(this, title,
+                          error.isEmpty() ? i18n("Could not write the file:\n%1", path)
+                                          : i18n("Could not write the file:\n%1\n%2", path, error));
+}
+
+void KisMainWindow::clearQuickActionState()
+{
+    KisDocument *document = d->quickActionDocument.data();
+    if (document) {
+        disconnect(document, SIGNAL(completed()), this, SLOT(slotQuickActionCompleted()));
+        disconnect(document, SIGNAL(canceled(QString)), this, SLOT(slotQuickActionCanceled(QString)));
+    }
+    d->quickActionDocument.clear();
+    d->quickActionPath.clear();
+}
+
 void KisMainWindow::slotFileSaveAs()
 {
     if (saveDocument(d->activeView->document(), true, false,false)) {
@@ -2954,6 +3118,14 @@ void KisMainWindow::createActions()
 
     d->saveActionAs = actionManager->createStandardAction(KStandardAction::SaveAs, this, SLOT(slotFileSaveAs()));
     d->saveActionAs->setActivationFlags(KisAction::ACTIVE_IMAGE);
+
+    d->quickSaveAction = actionManager->createAction("quick_save");
+    d->quickSaveAction->setActivationFlags(KisAction::ACTIVE_IMAGE);
+    connect(d->quickSaveAction, SIGNAL(triggered()), this, SLOT(slotQuickSave()));
+
+    d->quickExportAction = actionManager->createAction("quick_export");
+    d->quickExportAction->setActivationFlags(KisAction::ACTIVE_IMAGE);
+    connect(d->quickExportAction, SIGNAL(triggered()), this, SLOT(slotQuickExport()));
 
     d->undo = actionManager->createStandardAction(KStandardAction::Undo, this, SLOT(undo()));
     d->undo->setActivationFlags(KisAction::ACTIVE_IMAGE);

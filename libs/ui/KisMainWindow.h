@@ -256,6 +256,8 @@ public Q_SLOTS:
      *  Saves the current document with the current name.
      */
     void slotFileSave();
+    void slotQuickSave();
+    void slotQuickExport();
 
 
     void slotShowSessionManager();
@@ -301,6 +303,8 @@ private Q_SLOTS:
     void slotLoadCanceled(const QString &);
     void slotSaveCompleted();
     void slotSaveCanceled(const QString &);
+    void slotQuickActionCompleted();
+    void slotQuickActionCanceled(const QString &);
     void forceDockTabFonts();
 
     void slotUpdateWidgetStyle();
@@ -461,6 +465,8 @@ private:
     QDockWidget* createDockWidget(KoDockFactoryBase* factory);
 
     bool openDocumentInternal(const QString &path, KisMainWindow::OpenFlags f = KisMainWindow::OpenFlags());
+
+    void clearQuickActionState();
 
     void saveWindowSettings();
 

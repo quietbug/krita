@@ -17,6 +17,7 @@ private Q_SLOTS:
     void testUpdateGUI();
     void testCondition();
     void testTakeAction();
+    void testQuickActionsRegistered();
 };
 
 #endif // KIS_ACTION_MANAGER_TEST_H

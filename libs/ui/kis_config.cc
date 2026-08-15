@@ -2391,6 +2391,26 @@ void KisConfig::setExportMimeType(const QString &defaultExportMimeType)
     m_cfg.writeEntry("defaultExportMimeType", defaultExportMimeType);
 }
 
+QString KisConfig::quickSaveDirectory(bool defaultValue) const
+{
+    return defaultValue ? QString() : m_cfg.readEntry("quickSaveDirectory", QString());
+}
+
+void KisConfig::setQuickSaveDirectory(const QString &directory)
+{
+    m_cfg.writeEntry("quickSaveDirectory", directory);
+}
+
+QString KisConfig::quickExportDirectory(bool defaultValue) const
+{
+    return defaultValue ? QString() : m_cfg.readEntry("quickExportDirectory", QString());
+}
+
+void KisConfig::setQuickExportDirectory(const QString &directory)
+{
+    m_cfg.writeEntry("quickExportDirectory", directory);
+}
+
 bool KisConfig::toolOptionsInDocker(bool defaultValue) const
 {
     return (defaultValue ? true : m_cfg.readEntry("ToolOptionsInDocker", true));

@@ -107,6 +107,8 @@ public:
     bool renamePastedLayers();
     bool renameDuplicatedLayers();
     QString exportMimeType();
+    QString quickSaveDirectoryPath() const;
+    QString quickExportDirectoryPath() const;
     int forcedFontDpi();
 
     static void setColorSamplerPreviewStyleItems(QComboBox *cmb);

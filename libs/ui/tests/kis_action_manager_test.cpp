@@ -119,5 +119,21 @@ void KisActionManagerTest::testTakeAction()
     QVERIFY(view->viewManager()->actionManager()->actionByName("dummy") == 0);
 }
 
+void KisActionManagerTest::testQuickActionsRegistered()
+{
+    KisDocument* doc = createEmptyDocument();
+    KisMainWindow* mainWindow = KisPart::instance()->createMainWindow();
+    QPointer<KisView> view = new KisView(doc, mainWindow->viewManager(), mainWindow);
+    KisViewManager *viewManager = new KisViewManager(mainWindow, mainWindow->actionCollection());
+    KisPart::instance()->addView(view);
+    mainWindow->showView(view);
+
+    view->setViewManager(viewManager);
+    viewManager->setCurrentView(view);
+
+    QVERIFY(mainWindow->actionCollection()->action("quick_save"));
+    QVERIFY(mainWindow->actionCollection()->action("quick_export"));
+}
+
 
 KISTEST_MAIN(KisActionManagerTest)

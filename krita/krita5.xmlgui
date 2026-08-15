@@ -13,6 +13,8 @@ xsi:schemaLocation="http://www.kde.org/standards/kxmlgui/1.0  http://www.kde.org
       <Separator/>
       <Action name="file_save"/>
       <Action name="file_save_as"/>
+      <Action name="quick_save"/>
+      <Action name="quick_export"/>
       <Action name="file_reload_file"/>
       <Separator/>
       <Action name="file_sessions"/>

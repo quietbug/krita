@@ -17,6 +17,7 @@
 #include <QComboBox>
 #include <QClipboard>
 #include <QCursor>
+#include <QDir>
 #include <QScreen>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -410,6 +411,13 @@ GeneralTab::GeneralTab(QWidget *_parent, const char *_name)
     m_chkTrimKra->setChecked(cfg.trimKra());
     m_chkTrimFramesImport->setChecked(cfg.trimFramesImport());
 
+    quickSaveDirectory->setMode(KoFileDialog::OpenDirectory);
+    quickSaveDirectory->setConfigurationName("QuickSaveDirectory");
+    quickSaveDirectory->setFileName(cfg.quickSaveDirectory());
+    quickExportDirectory->setMode(KoFileDialog::OpenDirectory);
+    quickExportDirectory->setConfigurationName("QuickExportDirectory");
+    quickExportDirectory->setFileName(cfg.quickExportDirectory());
+
     m_backupFileCheckBox->setChecked(cfg.backupFile());
     cmbBackupFileLocation->setCurrentIndex(cfg.readEntry<int>("backupfilelocation", 0));
     txtBackupFileSuffix->setText(cfg.readEntry<QString>("backupfilesuffix", "~"));
@@ -762,6 +770,8 @@ void GeneralTab::setDefault()
     cmbBackupFileLocation->setCurrentIndex(0);
     txtBackupFileSuffix->setText("~");
     intNumBackupFiles->setValue(1);
+    quickSaveDirectory->setFileName(QString());
+    quickExportDirectory->setFileName(QString());
 
     m_showOutlinePainting->setChecked(cfg.showOutlineWhilePainting(true));
     m_changeBrushOutline->setChecked(!cfg.forceAlwaysFullSizedOutline(true));
@@ -985,6 +995,16 @@ bool GeneralTab::trimFramesImport()
 QString GeneralTab::exportMimeType()
 {
     return cmbDefaultExportFileType->currentData().toString();
+}
+
+QString GeneralTab::quickSaveDirectoryPath() const
+{
+    return quickSaveDirectory->fileName();
+}
+
+QString GeneralTab::quickExportDirectoryPath() const
+{
+    return quickExportDirectory->fileName();
 }
 
 bool GeneralTab::useZip64()
@@ -2927,6 +2947,10 @@ bool KisDlgPreferences::editPreferences(std::optional<PageDesc>page)
         cfg.setTrimKra(m_general->trimKra());
         cfg.setTrimFramesImport(m_general->trimFramesImport());
         cfg.setExportMimeType(m_general->exportMimeType());
+        const QString quickSaveDirectory = m_general->quickSaveDirectoryPath();
+        const QString quickExportDirectory = m_general->quickExportDirectoryPath();
+        cfg.setQuickSaveDirectory(quickSaveDirectory.isEmpty() ? QString() : QDir::cleanPath(quickSaveDirectory));
+        cfg.setQuickExportDirectory(quickExportDirectory.isEmpty() ? QString() : QDir::cleanPath(quickExportDirectory));
         cfg.setUseZip64(m_general->useZip64());
         cfg.setPasteFormat(m_general->m_pasteFormatGroup.checkedId());
 

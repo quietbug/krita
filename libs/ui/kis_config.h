@@ -658,6 +658,12 @@ public:
     QString exportMimeType(bool defaultValue) const;
     void setExportMimeType(const QString &defaultExportMimeType);
 
+    QString quickSaveDirectory(bool defaultValue = false) const;
+    void setQuickSaveDirectory(const QString &directory);
+
+    QString quickExportDirectory(bool defaultValue = false) const;
+    void setQuickExportDirectory(const QString &directory);
+
     bool toolOptionsInDocker(bool defaultValue = false) const;
     void setToolOptionsInDocker(bool inDocker);
 

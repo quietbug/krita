@@ -62,6 +62,30 @@
       <isCheckable>false</isCheckable>
       <statusTip></statusTip>
     </Action>
+    <Action name="quick_save">
+      <icon>document-save</icon>
+      <text>Quick Save</text>
+      <whatsThis>Save the document to the configured quick save directory</whatsThis>
+      <toolTip>Quick Save</toolTip>
+      <iconText>Quick Save</iconText>
+      <activationFlags>1</activationFlags>
+      <activationConditions>0</activationConditions>
+      <shortcut></shortcut>
+      <isCheckable>false</isCheckable>
+      <statusTip></statusTip>
+    </Action>
+    <Action name="quick_export">
+      <icon>document-export</icon>
+      <text>Quick Export</text>
+      <whatsThis>Export the document to the configured quick export directory</whatsThis>
+      <toolTip>Quick Export</toolTip>
+      <iconText>Quick Export</iconText>
+      <activationFlags>1</activationFlags>
+      <activationConditions>0</activationConditions>
+      <shortcut></shortcut>
+      <isCheckable>false</isCheckable>
+      <statusTip></statusTip>
+    </Action>
     <Action name="file_sessions">
       <icon></icon>
       <text>Sessions...</text>
