@@ -567,8 +567,9 @@ void KisAsyncColorSamplerHelper::slotAddSamplingJob(const QPointF &docPoint)
     if (m_d->sampleSource == KisToolUtils::ColorSamplerSource::MergedImage) {
         KisSharedPtr<KisReferenceImagesLayer> referencesLayer = m_d->canvas->imageView()->document()->referenceImagesLayer();
         if (referencesLayer && m_d->canvas->referenceImagesDecoration()->visible()) {
-            QColor color = referencesLayer->getPixel(imagePoint);
-            if (color.isValid() && color.alpha() != 0) {
+            QColor color = referencesLayer->getPixel(
+                docPoint, m_d->canvas->coordinatesConverter()->documentToWidget(docPoint));
+            if (color.isValid()) {
                 slotColorSamplingFinished(KoColor(color, image->colorSpace()));
                 return;
             }

@@ -31,7 +31,7 @@ public:
                      KoFlake::ShapeSelection selection = KoFlake::ShapeOnTop) const;
 
     QRectF boundingImageRect() const;
-    QColor getPixel(QPointF position) const;
+    QColor getPixel(const QPointF &documentPoint, const QPointF &widgetPoint) const;
 
     void paintReferences(QPainter &painter);
     void paintReferencesInWidget(QPainter &painter);

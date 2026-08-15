@@ -366,16 +366,16 @@ QRectF KisReferenceImagesLayer::boundingImageRect() const
     return result;
 }
 
-QColor KisReferenceImagesLayer::getPixel(QPointF position) const
+QColor KisReferenceImagesLayer::getPixel(const QPointF &documentPoint,
+                                         const QPointF &widgetPoint) const
 {
-    const QPointF docPoint = converter()->viewToDocument(position);
-    KoShape *shape = shapeAt(docPoint, converter()->viewToWidget().map(position));
+    KoShape *shape = shapeAt(documentPoint, widgetPoint);
 
     if (shape) {
         auto *reference = dynamic_cast<KisReferenceImage*>(shape);
         KIS_SAFE_ASSERT_RECOVER_RETURN_VALUE(reference, QColor());
 
-        return reference->getPixel(reference->pinned() ? converter()->viewToWidget().map(position) : docPoint);
+        return reference->getPixel(reference->pinned() ? widgetPoint : documentPoint);
     }
 
     return QColor();

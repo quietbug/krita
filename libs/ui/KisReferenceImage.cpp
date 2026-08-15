@@ -414,7 +414,13 @@ QColor KisReferenceImage::getPixel(QPointF position)
         d->updateCache();
     }
 
-    return d->cachedImage.pixelColor(localPosition.toPoint());
+    const QPoint pixelPosition = localPosition.toPoint();
+    if (!d->cachedImage.rect().contains(pixelPosition)) {
+        return QColor();
+    }
+
+    const QColor color = d->cachedImage.pixelColor(pixelPosition);
+    return color.alpha() == 0 ? QColor() : color;
 }
 
 void KisReferenceImage::saveXml(QDomDocument &document, QDomElement &parentElement, int id)

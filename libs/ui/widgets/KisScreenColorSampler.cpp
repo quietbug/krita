@@ -170,12 +170,13 @@ KoColor KisScreenColorSampler::grabScreenColor(const QPoint &p)
                 KisImageWSP image = view->image();
 
                 if (image) {
+                    const QPointF documentPoint = canvas->coordinatesConverter()->widgetToDocument(widgetPoint);
                     QPointF imagePoint = canvas->coordinatesConverter()->widgetToImage(widgetPoint);
                     // sample from reference images first
                     KisSharedPtr<KisReferenceImagesLayer> referenceImageLayer = view->document()->referenceImagesLayer();
 
                     if (referenceImageLayer && canvas->referenceImagesDecoration()->visible()) {
-                        QColor color = referenceImageLayer->getPixel(imagePoint);
+                        QColor color = referenceImageLayer->getPixel(documentPoint, widgetPoint);
                         if (color.isValid()) {
                             return KoColor(color, image->colorSpace());
                         }
@@ -322,4 +323,3 @@ bool KisScreenColorSamplingEventFilter::eventFilter(QObject *, QEvent *event)
 KIS_DECLARE_STATIC_INITIALIZER {
     KisDlgInternalColorSelector::setScreenColorSamplerFactory(KisScreenColorSampler::createScreenColorSampler);
 }
-
