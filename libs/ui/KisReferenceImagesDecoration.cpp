@@ -134,11 +134,6 @@ void KisReferenceImagesDecoration::drawDecoration(QPainter &gc, const QRectF &/*
     KisSharedPtr<KisReferenceImagesLayer> layer = d->layer.toStrongRef();
 
     if (!layer.isNull()) {
-        if (layer->hasPinnedReferences()) {
-            layer->paintReferencesInWidget(gc);
-            return;
-        }
-
         QSizeF viewSize = view()->size();
 
         QTransform transform = converter->imageToWidgetTransform();
@@ -151,6 +146,10 @@ void KisReferenceImagesDecoration::drawDecoration(QPainter &gc, const QRectF &/*
 
         if (!d->buffer.image.isNull()) {
             gc.drawImage(d->buffer.position, d->buffer.image);
+        }
+
+        if (layer->hasPinnedReferences()) {
+            layer->paintReferencesInWidget(gc);
         }
     }
 }

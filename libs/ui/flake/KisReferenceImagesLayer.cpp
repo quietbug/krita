@@ -212,14 +212,12 @@ void KisReferenceImagesLayer::paintReferences(QPainter &painter) {
 
     for (KoShape *shape : sortedShapes) {
         auto *reference = dynamic_cast<KisReferenceImage*>(shape);
-        if (!reference) {
+        if (!reference || reference->pinned()) {
             continue;
         }
 
         painter.setTransform(baseTransform);
-        if (!reference->pinned()) {
-            painter.setTransform(documentToView, true);
-        }
+        painter.setTransform(documentToView, true);
         shapeManager()->renderSingleShape(reference, painter);
     }
 }
@@ -230,21 +228,13 @@ void KisReferenceImagesLayer::paintReferencesInWidget(QPainter &painter)
     std::sort(sortedShapes.begin(), sortedShapes.end(), KoShape::compareShapeZIndex);
 
     const QTransform baseTransform = painter.transform();
-    const auto *coordinatesConverter = dynamic_cast<const KisCoordinatesConverter*>(converter());
-    const QTransform documentToWidget = coordinatesConverter
-            ? coordinatesConverter->documentToWidgetTransform()
-            : converter()->viewToWidget() * converter()->documentToView();
-
     for (KoShape *shape : sortedShapes) {
         auto *reference = dynamic_cast<KisReferenceImage*>(shape);
-        if (!reference) {
+        if (!reference || !reference->pinned()) {
             continue;
         }
 
         painter.setTransform(baseTransform);
-        if (!reference->pinned()) {
-            painter.setTransform(documentToWidget, true);
-        }
         shapeManager()->renderSingleShape(reference, painter);
     }
 }
