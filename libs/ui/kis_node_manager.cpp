@@ -167,11 +167,11 @@ void collectEmptyLayers(const KisNodeSP &parent,
 {
     const KisNodeList children = parent->childNodes(QStringList(), KoProperties());
     for (const KisNodeSP &node : children) {
-        if (KisShapeLayer *shapeLayer = dynamic_cast<KisShapeLayer *>(node.data())) {
+        if (const KisShapeLayer *shapeLayer = dynamic_cast<const KisShapeLayer *>(node.data())) {
             if (shapeLayer->shapes().isEmpty() && node->isEditable(false)) {
                 emptyLayers->append(node);
             }
-        } else if (KisPaintLayer *paintLayer = dynamic_cast<KisPaintLayer *>(node.data())) {
+        } else if (const KisPaintLayer *paintLayer = dynamic_cast<const KisPaintLayer *>(node.data())) {
             if (image->colorSpace()->colorModelId() == RGBAColorModelID
                     && isEmptyRgbaPaintLayer(paintLayer)
                     && node->isEditable(false)) {
