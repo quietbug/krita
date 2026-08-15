@@ -22,6 +22,8 @@ private Q_SLOTS:
     void testConvertCloneToSelectionMask();
 
     void testConvertBlurToSelectionMask();
+
+    void testCleanupEmptyLayers();
 };
 
 #endif /* __KIS_NODE_MANAGER_TEST_H */

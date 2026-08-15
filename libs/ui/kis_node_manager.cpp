@@ -11,6 +11,10 @@
 #include <KisSignalMapper.h>
 #include <QApplication>
 
+#ifndef NDEBUG
+#include <iostream>
+#endif
+
 #include <kactioncollection.h>
 
 #include <QKeySequence>
@@ -131,6 +135,55 @@ struct KisNodeManager::Private {
     void mergeTransparencyMaskAsAlpha(bool writeToLayers);
     KisNodeJugglerCompressed* lazyGetJuggler(const KUndo2MagicString &actionName);
 };
+
+namespace {
+
+bool isEmptyRgbaPaintLayer(const KisPaintLayer *layer)
+{
+    const KisPaintDeviceSP device = layer->paintDevice();
+    if (!device) {
+        return true;
+    }
+
+    const QRect rect = device->extent();
+    if (rect.isEmpty()) {
+        return true;
+    }
+
+    KisSequentialConstIterator iterator(device, rect);
+    const KoColorSpace *colorSpace = device->colorSpace();
+    while (iterator.nextPixel()) {
+        if (colorSpace->opacityF(iterator.rawDataConst()) > 0.0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void collectEmptyLayers(const KisNodeSP &parent,
+                        const KisImageSP &image,
+                        KisNodeList *emptyLayers)
+{
+    const KisNodeList children = parent->childNodes(QStringList(), KoProperties());
+    for (const KisNodeSP &node : children) {
+        if (KisShapeLayer *shapeLayer = dynamic_cast<KisShapeLayer *>(node.data())) {
+            if (shapeLayer->shapes().isEmpty() && node->isEditable(false)) {
+                emptyLayers->append(node);
+            }
+        } else if (KisPaintLayer *paintLayer = dynamic_cast<KisPaintLayer *>(node.data())) {
+            if (image->colorSpace()->colorModelId() == RGBAColorModelID
+                    && isEmptyRgbaPaintLayer(paintLayer)
+                    && node->isEditable(false)) {
+                emptyLayers->append(node);
+            }
+        }
+
+        collectEmptyLayers(node, image, emptyLayers);
+    }
+}
+
+}
 
 bool KisNodeManager::Private::activateNodeImpl(KisNodeSP node)
 {
@@ -314,6 +367,10 @@ void KisNodeManager::setup(KisKActionCollection * actionCollection, KisActionMan
 
     action = actionManager->createAction("duplicatelayer");
     connect(action, SIGNAL(triggered()), this, SLOT(duplicateActiveNode()));
+
+    action = actionManager->createAction("cleanup_empty");
+    action->setActivationFlags(KisAction::ACTIVE_IMAGE);
+    connect(action, SIGNAL(triggered()), this, SLOT(cleanupEmptyLayers()));
 
     action = actionManager->createAction("copy_layer_clipboard");
     connect(action, SIGNAL(triggered()), this, SLOT(copyLayersToClipboard()));
@@ -1109,6 +1166,27 @@ void KisNodeManager::removeSelectedNodes(KisNodeList nodes)
 void KisNodeManager::removeNode()
 {
     removeSelectedNodes(selectedNodes());
+}
+
+void KisNodeManager::cleanupEmptyLayers()
+{
+    const KisImageSP image = m_d->view->image();
+    if (!image) {
+        return;
+    }
+
+    KisNodeList emptyLayers;
+    collectEmptyLayers(image->root(), image, &emptyLayers);
+    if (emptyLayers.isEmpty()) {
+        return;
+    }
+
+    KisNodeJugglerCompressed *juggler = m_d->lazyGetJuggler(kundo2_i18n("Cleanup Empty Layers"));
+    juggler->removeNode(emptyLayers);
+
+#ifndef NDEBUG
+    std::cout << "Cleanup Empty removed " << emptyLayers.size() << " layers" << std::endl;
+#endif
 }
 
 void KisNodeManager::mirrorNodeX()

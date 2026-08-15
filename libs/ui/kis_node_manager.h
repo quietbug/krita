@@ -199,6 +199,7 @@ public Q_SLOTS:
     void nodeCompositeOpChanged(const KoCompositeOp* op);
     void duplicateActiveNode();
     void removeNode();
+    void cleanupEmptyLayers();
     void mirrorNodeX();
     void mirrorNodeY();
     void mirrorAllNodesX();

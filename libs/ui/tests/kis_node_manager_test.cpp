@@ -58,6 +58,10 @@ public:
     }
 
     KisNodeManager *nodeManager;
+
+    KisDocument *document() const {
+        return doc;
+    }
 };
 
 void testMirrorNode(bool useShapeLayer, const QString &name, bool mirrorX)
@@ -175,6 +179,37 @@ void KisNodeManagerTest::testConvertCloneToSelectionMask()
 void KisNodeManagerTest::testConvertBlurToSelectionMask()
 {
     testConvertToSelectionMask(false);
+}
+
+void KisNodeManagerTest::testCleanupEmptyLayers()
+{
+    NodeManagerTester t;
+
+    KisPaintLayerSP emptyRaster = new KisPaintLayer(t.image, "empty-raster", OPACITY_OPAQUE_U8);
+    KisPaintLayerSP lockedRaster = new KisPaintLayer(t.image, "locked-raster", OPACITY_OPAQUE_U8);
+    lockedRaster->setUserLocked(true);
+    KisShapeLayerSP emptyVector = new KisShapeLayer(t.document()->shapeController(), t.image.data(),
+                                                    "empty-vector", OPACITY_OPAQUE_U8);
+
+    t.image->addNode(emptyRaster);
+    t.image->addNode(lockedRaster);
+    t.image->addNode(emptyVector);
+
+    t.nodeManager->cleanupEmptyLayers();
+    QTest::qWait(1000);
+    t.image->waitForDone();
+
+    QVERIFY(!findNode(t.image->root(), "empty-raster"));
+    QVERIFY(!findNode(t.image->root(), "empty-vector"));
+    QVERIFY(findNode(t.image->root(), "locked-raster"));
+    QVERIFY(findNode(t.image->root(), "paint1"));
+
+    t.undoStore->undo();
+    QTest::qWait(1000);
+    t.image->waitForDone();
+
+    QVERIFY(findNode(t.image->root(), "empty-raster"));
+    QVERIFY(findNode(t.image->root(), "empty-vector"));
 }
 
 KISTEST_MAIN(KisNodeManagerTest)
