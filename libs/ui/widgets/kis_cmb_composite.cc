@@ -15,6 +15,8 @@
 #include "kis_composite_ops_model.h"
 #include "kis_categorized_item_delegate.h"
 #include <kis_action.h>
+#include <QKeyEvent>
+#include <QTimer>
 #include <QWheelEvent>
 #include "kis_action_manager.h"
 
@@ -81,6 +83,26 @@ KisCompositeOpComboBox::KisCompositeOpComboBox(bool limitToLayerStyles, QWidget*
 
     connect(m_view, SIGNAL(sigCategoryToggled(QModelIndex,bool)), SLOT(slotCategoryToggled(QModelIndex,bool)));
     connect(m_view, SIGNAL(sigEntryChecked(QModelIndex)), SLOT(slotEntryChecked(QModelIndex)));
+    connect(m_view, &QListView::entered, this, &KisCompositeOpComboBox::slotPreviewIndex);
+    connect(m_view, &KisCategorizedListView::sigCompositeItemPressed,
+            this, [this] (const QModelIndex &index, bool checkboxPressed) {
+                const bool categoryPressed = index.data(__CategorizedListModelBase::IsHeaderRole).toBool();
+
+                if (m_previewActive && !categoryPressed) {
+                    m_view->setCompositeItemPressConsumed(true);
+
+                    if (checkboxPressed) {
+                        cancelPreview();
+                        QComboBox::hidePopup();
+                    } else {
+                        slotPreviewIndexActivated(index);
+                    }
+                } else if (m_previewActive && categoryPressed) {
+                    // Category clicks cancel the current preview, but must
+                    // continue through QListView so the category can toggle.
+                    cancelPreview();
+                }
+            });
 
     selectCompositeOp(KoCompositeOpRegistry::instance().getDefaultCompositeOp());
 }
@@ -88,6 +110,44 @@ KisCompositeOpComboBox::KisCompositeOpComboBox(bool limitToLayerStyles, QWidget*
 KisCompositeOpComboBox::~KisCompositeOpComboBox()
 {
     delete m_view;
+}
+
+void KisCompositeOpComboBox::setPreviewEnabled(bool value)
+{
+    if (m_previewEnabled == value) return;
+
+    if (m_previewActive) {
+        cancelPreview();
+    }
+
+    m_previewEnabled = value;
+    m_view->setMouseTracking(value);
+}
+
+bool KisCompositeOpComboBox::previewEnabled() const
+{
+    return m_previewEnabled;
+}
+
+bool KisCompositeOpComboBox::previewActive() const
+{
+    return m_previewActive;
+}
+
+bool KisCompositeOpComboBox::previewCommitInProgress() const
+{
+    return m_previewCommitInProgress;
+}
+
+void KisCompositeOpComboBox::showPopup()
+{
+    QComboBox::showPopup();
+
+    if (!m_previewEnabled || m_previewActive) return;
+
+    m_previewActive = true;
+    m_previewIndex = QModelIndex();
+    Q_EMIT sigPreviewPopupOpened();
 }
 
 void KisCompositeOpComboBox::connectBlendmodeActions(KisActionManager *manager)
@@ -212,6 +272,23 @@ void KisCompositeOpComboBox::slotCategoryToggled(const QModelIndex& index, bool 
     Q_UNUSED(index);
     Q_UNUSED(toggled);
 
+    if (m_previewEnabled) {
+        if (m_previewActive) {
+            cancelPreview();
+        }
+
+        // Keep the popup open while the category expands or collapses. This
+        // also lets QComboBox recalculate the popup geometry.
+        showPopup();
+        return;
+    }
+
+    if (m_previewActive) {
+        cancelPreview();
+        QComboBox::hidePopup();
+        return;
+    }
+
     //NOTE: this will (should) fit the size of the
     //      popup widget to the view
     //      don't know if this is expected behaviour
@@ -223,11 +300,96 @@ void KisCompositeOpComboBox::slotCategoryToggled(const QModelIndex& index, bool 
 void KisCompositeOpComboBox::slotEntryChecked(const QModelIndex& index)
 {
     Q_UNUSED(index);
+
+    if (m_previewEnabled) {
+        if (m_previewActive) {
+            cancelPreview();
+        }
+        return;
+    }
+
+    if (m_previewActive) {
+        cancelPreview();
+        QComboBox::hidePopup();
+        return;
+    }
+
     m_allowToHidePopup = false;
+}
+
+bool KisCompositeOpComboBox::isPreviewableIndex(const QModelIndex &index) const
+{
+    KoID op;
+    return index.isValid()
+        && (m_model->flags(index) & Qt::ItemIsEnabled)
+        && m_model->entryAt(op, index);
+}
+
+void KisCompositeOpComboBox::requestPreview(const QModelIndex &index)
+{
+    if (!m_previewActive || !isPreviewableIndex(index) || m_previewIndex == index) return;
+
+    KoID op;
+    const bool found = m_model->entryAt(op, index);
+    Q_ASSERT(found);
+
+    m_previewIndex = index;
+    setCurrentIndex(index.row());
+    Q_EMIT sigPreviewRequested(op.id());
+}
+
+void KisCompositeOpComboBox::confirmPreview(const QModelIndex &index)
+{
+    if (!m_previewActive) return;
+
+    if (!isPreviewableIndex(index)) {
+        cancelPreview();
+        QComboBox::hidePopup();
+        return;
+    }
+
+    requestPreview(index);
+
+    KoID op;
+    const bool found = m_model->entryAt(op, index);
+    Q_ASSERT(found);
+
+    m_previewActive = false;
+    m_previewCommitInProgress = true;
+    Q_EMIT sigPreviewConfirmed(op.id());
+    QComboBox::hidePopup();
+    QTimer::singleShot(0, this, [this] { m_previewCommitInProgress = false; });
+}
+
+void KisCompositeOpComboBox::cancelPreview()
+{
+    if (!m_previewActive) return;
+
+    m_previewActive = false;
+    m_previewIndex = QModelIndex();
+    Q_EMIT sigPreviewCancelled();
+}
+
+void KisCompositeOpComboBox::slotPreviewIndex(const QModelIndex &index)
+{
+    requestPreview(index);
+}
+
+void KisCompositeOpComboBox::slotPreviewIndexActivated(const QModelIndex &index)
+{
+    if (m_previewActive) {
+        confirmPreview(index);
+    }
 }
 
 void KisCompositeOpComboBox::hidePopup()
 {
+    if (m_previewActive) {
+        cancelPreview();
+        QComboBox::hidePopup();
+        return;
+    }
+
     if (m_allowToHidePopup) {
         QComboBox::hidePopup();
     }
@@ -426,6 +588,9 @@ void KisCompositeOpComboBox::wheelEvent(QWheelEvent *e)
     if (style()->styleHint(QStyle::SH_ComboBox_AllowWheelScrolling, &opt, this)) {
         if (e->angleDelta().y() != 0) {
             selectNeighbouringBlendMode(e->angleDelta().y() < 0);
+            if (m_previewActive) {
+                requestPreview(m_model->index(currentIndex(), 0));
+            }
         }
 
         e->accept();
@@ -436,6 +601,29 @@ void KisCompositeOpComboBox::wheelEvent(QWheelEvent *e)
 
 void KisCompositeOpComboBox::keyPressEvent(QKeyEvent *e)
 {
+    if (m_previewActive) {
+        if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
+            confirmPreview(m_view->currentIndex());
+            e->accept();
+            return;
+        }
+
+        if (e->key() == Qt::Key_Escape) {
+            cancelPreview();
+            QComboBox::hidePopup();
+            e->accept();
+            return;
+        }
+
+        QComboBox::keyPressEvent(e);
+        QTimer::singleShot(0, this, [this] {
+            if (m_previewActive) {
+                requestPreview(m_view->currentIndex());
+            }
+        });
+        return;
+    }
+
     /**
      * This code is a copy of QComboBox::keyPressEvent. It does the same thing,
      * except that it skips "Category" items, by checking m_model->entryAt()

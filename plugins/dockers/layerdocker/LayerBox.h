@@ -101,6 +101,10 @@ private Q_SLOTS:
     void slotChangeCloneSourceClicked();
 
     void slotCompositeOpChanged(int index);
+    void slotCompositeOpPreviewOpened();
+    void slotCompositeOpPreviewRequested(const QString &compositeOp);
+    void slotCompositeOpPreviewConfirmed(const QString &compositeOp);
+    void slotCompositeOpPreviewCancelled();
     void slotOpacityChanged();
     void slotOpacitySliderMoved(qreal opacity);
 
@@ -146,6 +150,8 @@ private:
     inline void addActionToMenu(QMenu *menu, const QString &id);
     // reimp from KisNodeManager
     qint32 convertOpacityToInt(qreal opacity);
+    void cancelCompositeOpPreview();
+    void applyCompositeOpPreview(const QString &compositeOp);
 
     KisNodeSP findNonHidableNode(KisNodeSP startNode);
 private:
@@ -186,6 +192,10 @@ private:
     KisNodeSP m_activeNode;
     KisNodeWSP m_savedNodeBeforeEditSelectionMode;
     KisSignalAutoConnectionsStore m_activeNodeConnections;
+
+    KisNodeList m_compositeOpPreviewNodes;
+    QStringList m_compositeOpPreviewOriginalModes;
+    bool m_compositeOpPreviewActive {false};
 };
 
 class KRITALAYERDOCKER_EXPORT LayerBoxFactory : public KoDockFactoryBase
@@ -213,4 +223,3 @@ public:
 };
 
 #endif // KIS_LAYERBOX_H
-

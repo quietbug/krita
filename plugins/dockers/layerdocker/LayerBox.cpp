@@ -32,6 +32,7 @@
 #include <QWidgetAction>
 #include <QProxyStyle>
 #include <QStyleFactory>
+#include <kundo2command.h>
 
 #include <kis_debug.h>
 #include <klocalizedstring.h>
@@ -44,6 +45,8 @@
 
 #include <kis_types.h>
 #include <kis_image.h>
+#include <KisImageBarrierLock.h>
+#include <kis_undo_adapter.h>
 #include <kis_paint_device.h>
 #include <kis_layer.h>
 #include <kis_group_layer.h>
@@ -123,6 +126,48 @@ public:
             QProxyStyle::drawPrimitive(element, option, painter, widget);
         }
     }
+};
+
+class MultinodeCompositeOpCommand final : public KUndo2Command
+{
+public:
+    MultinodeCompositeOpCommand(const KisNodeList &nodes,
+                                const QStringList &oldCompositeOps,
+                                const QString &newCompositeOp)
+        : KUndo2Command(kundo2_i18n("Composition Mode Change"))
+        , m_nodes(nodes)
+        , m_oldCompositeOps(oldCompositeOps)
+        , m_newCompositeOp(newCompositeOp)
+    {
+        Q_ASSERT(m_nodes.size() == m_oldCompositeOps.size());
+    }
+
+    void redo() override
+    {
+        Q_FOREACH (const KisNodeSP &node, m_nodes) {
+            setCompositeOp(node, m_newCompositeOp);
+        }
+    }
+
+    void undo() override
+    {
+        for (int i = 0; i < m_nodes.size(); ++i) {
+            setCompositeOp(m_nodes[i], m_oldCompositeOps[i]);
+        }
+    }
+
+private:
+    static void setCompositeOp(KisNodeSP node, const QString &compositeOp)
+    {
+        const QRect oldExtent = node->extent();
+        node->setCompositeOpId(compositeOp);
+        node->setDirty(oldExtent | node->extent());
+    }
+
+private:
+    KisNodeList m_nodes;
+    QStringList m_oldCompositeOps;
+    QString m_newCompositeOp;
 };
 
 inline void LayerBox::connectActionToButton(KisViewManager* viewManager, QAbstractButton *button, const QString &id)
@@ -214,7 +259,12 @@ LayerBox::LayerBox()
     connect(m_wdgLayerBox->doubleOpacity, SIGNAL(valueChanged(qreal)), SLOT(slotOpacitySliderMoved(qreal)));
     connect(&m_nodeOpacityCompressor, SIGNAL(timeout()), SLOT(slotOpacityChanged()));
 
+    m_wdgLayerBox->cmbComposite->setPreviewEnabled(true);
     connect(m_wdgLayerBox->cmbComposite, SIGNAL(activated(int)), SLOT(slotCompositeOpChanged(int)));
+    connect(m_wdgLayerBox->cmbComposite, SIGNAL(sigPreviewPopupOpened()), SLOT(slotCompositeOpPreviewOpened()));
+    connect(m_wdgLayerBox->cmbComposite, SIGNAL(sigPreviewRequested(QString)), SLOT(slotCompositeOpPreviewRequested(QString)));
+    connect(m_wdgLayerBox->cmbComposite, SIGNAL(sigPreviewConfirmed(QString)), SLOT(slotCompositeOpPreviewConfirmed(QString)));
+    connect(m_wdgLayerBox->cmbComposite, SIGNAL(sigPreviewCancelled()), SLOT(slotCompositeOpPreviewCancelled()));
 
     m_newLayerMenu = new QMenu(this);
     m_wdgLayerBox->bnAdd->setMenu(m_newLayerMenu);
@@ -438,6 +488,7 @@ LayerBox::LayerBox()
 
 LayerBox::~LayerBox()
 {
+    cancelCompositeOpPreview();
     delete m_wdgLayerBox;
 }
 
@@ -544,6 +595,7 @@ void LayerBox::setCanvas(KoCanvasBase *canvas)
     setEnabled(canvas != 0);
 
     if (m_canvas) {
+        cancelCompositeOpPreview();
         m_canvas->disconnectCanvasObserver(this);
         m_nodeModel->setIdleTaskManager(0);
         m_nodeModel->setDummiesFacade(0, 0, 0, 0, 0);
@@ -633,6 +685,7 @@ void LayerBox::setCanvas(KoCanvasBase *canvas)
 
 void LayerBox::unsetCanvas()
 {
+    cancelCompositeOpPreview();
     setEnabled(false);
     if (m_canvas) {
         m_newLayerMenu->clear();
@@ -753,6 +806,8 @@ void LayerBox::setCurrentNode(KisNodeSP node)
         return;
     }
 
+    cancelCompositeOpPreview();
+
     m_filteringModel->setActiveNode(node);
 
     QModelIndex index = node ? m_filteringModel->indexFromNode(node) : QModelIndex();
@@ -864,10 +919,93 @@ void LayerBox::slotChangeCloneSourceClicked()
 void LayerBox::slotCompositeOpChanged(int index)
 {
     Q_UNUSED(index);
-    if (!m_canvas) return;
+    if (!m_canvas || m_compositeOpPreviewActive || m_wdgLayerBox->cmbComposite->previewCommitInProgress()) return;
 
     QString compositeOp = m_wdgLayerBox->cmbComposite->selectedCompositeOp().id();
     m_nodeManager->nodeCompositeOpChanged(m_nodeManager->activeColorSpace()->compositeOp(compositeOp));
+}
+
+void LayerBox::slotCompositeOpPreviewOpened()
+{
+    cancelCompositeOpPreview();
+
+    if (!m_canvas || !m_image || !m_nodeManager) return;
+
+    const KisNodeList selectedNodes = m_nodeManager->selectedNodes();
+    Q_FOREACH (const KisNodeSP &node, selectedNodes) {
+        const KisGroupLayer *group = qobject_cast<const KisGroupLayer*>(node.data());
+        if (!node || !node->isEditable(false) || !node->compositeOp() || (group && group->passThroughMode())) {
+            continue;
+        }
+
+        m_compositeOpPreviewNodes << node;
+        m_compositeOpPreviewOriginalModes << node->compositeOpId();
+    }
+
+    m_compositeOpPreviewActive = !m_compositeOpPreviewNodes.isEmpty();
+}
+
+void LayerBox::applyCompositeOpPreview(const QString &compositeOp)
+{
+    if (!m_compositeOpPreviewActive || !m_image) return;
+
+    KisImageBarrierLock lock(m_image);
+    Q_FOREACH (KisNodeSP node, m_compositeOpPreviewNodes) {
+        const QRect oldExtent = node->extent();
+        node->setCompositeOpId(compositeOp);
+        node->setDirty(oldExtent | node->extent());
+    }
+}
+
+void LayerBox::slotCompositeOpPreviewRequested(const QString &compositeOp)
+{
+    applyCompositeOpPreview(compositeOp);
+}
+
+void LayerBox::slotCompositeOpPreviewConfirmed(const QString &compositeOp)
+{
+    if (!m_compositeOpPreviewActive || !m_image) return;
+
+    bool changed = false;
+    Q_FOREACH (const QString &oldCompositeOp, m_compositeOpPreviewOriginalModes) {
+        changed |= oldCompositeOp != compositeOp;
+    }
+
+    KisNodeList nodes = m_compositeOpPreviewNodes;
+    QStringList oldCompositeOps = m_compositeOpPreviewOriginalModes;
+    m_compositeOpPreviewNodes.clear();
+    m_compositeOpPreviewOriginalModes.clear();
+    m_compositeOpPreviewActive = false;
+
+    if (changed) {
+        m_image->undoAdapter()->addCommand(
+            new MultinodeCompositeOpCommand(nodes, oldCompositeOps, compositeOp));
+    }
+}
+
+void LayerBox::cancelCompositeOpPreview()
+{
+    if (!m_compositeOpPreviewActive) return;
+
+    if (m_image) {
+        KisImageBarrierLock lock(m_image);
+        for (int i = 0; i < m_compositeOpPreviewNodes.size(); ++i) {
+            KisNodeSP node = m_compositeOpPreviewNodes[i];
+            const QRect oldExtent = node->extent();
+            node->setCompositeOpId(m_compositeOpPreviewOriginalModes[i]);
+            node->setDirty(oldExtent | node->extent());
+        }
+    }
+
+    m_compositeOpPreviewNodes.clear();
+    m_compositeOpPreviewOriginalModes.clear();
+    m_compositeOpPreviewActive = false;
+}
+
+void LayerBox::slotCompositeOpPreviewCancelled()
+{
+    cancelCompositeOpPreview();
+    updateUI();
 }
 
 void LayerBox::slotOpacityChanged()
@@ -1040,6 +1178,8 @@ void LayerBox::slotEditGlobalSelection(bool showSelections)
 void LayerBox::selectionChanged(const QModelIndexList &selection)
 {
     if (!m_nodeManager) return;
+
+    cancelCompositeOpPreview();
 
     /**
      * When the user clears the extended selection by clicking on the

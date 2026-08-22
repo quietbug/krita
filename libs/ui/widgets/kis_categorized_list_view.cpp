@@ -59,6 +59,11 @@ void KisCategorizedListView::setCompositeBoxControl(bool value)
     isCompositeBoxControl = value;
 }
 
+void KisCategorizedListView::setCompositeItemPressConsumed(bool value)
+{
+    m_compositeItemPressConsumed = value;
+}
+
 void KisCategorizedListView::updateRows(int begin, int end)
 {
     for(; begin!=end; ++begin) {
@@ -116,9 +121,21 @@ void KisCategorizedListView::rowsAboutToBeRemoved(const QModelIndex &parent, int
 
 void KisCategorizedListView::mousePressEvent(QMouseEvent* event)
 {
-    QListView::mousePressEvent(event);
-
     QModelIndex index = QListView::indexAt(event->pos());
+
+    if (isCompositeBoxControl) {
+        const bool checkboxPressed = index.isValid()
+            && event->pos().x() < 25
+            && (model()->flags(index) & Qt::ItemIsUserCheckable);
+        m_compositeItemPressConsumed = false;
+        Q_EMIT sigCompositeItemPressed(index, checkboxPressed);
+        if (m_compositeItemPressConsumed) {
+            event->accept();
+            return;
+        }
+    }
+
+    QListView::mousePressEvent(event);
 
 
     // hack: the custom compositeop combo box has issues with events being sent
@@ -180,6 +197,4 @@ void KisCategorizedListView::slotScrollerStateChange(QScroller::State state)
 {
     KisKineticScroller::updateCursor(this, state);
 }
-
-
 

@@ -22,10 +22,12 @@ public:
 
     QSize sizeHint() const override;
     void setCompositeBoxControl(bool value);
+    void setCompositeItemPressConsumed(bool value);
 
 Q_SIGNALS:
     void sigCategoryToggled(const QModelIndex& index, bool toggled);
     void sigEntryChecked(const QModelIndex& index);
+    void sigCompositeItemPressed(const QModelIndex& index, bool checkboxPressed);
     void rightClickedMenuDropSettingsTriggered();
     void rightClickedMenuSaveSettingsTriggered();
     void lockAreaTriggered(const QModelIndex& index);
@@ -42,6 +44,7 @@ protected Q_SLOTS:
 private:
     void updateRows(int begin, int end);    
     bool isCompositeBoxControl = false;
+    bool m_compositeItemPressConsumed = false;
 };
 
 #endif // KIS_CATEGORIZED_LIST_VIEW_H_

@@ -45,20 +45,38 @@ public:
      KisCompositeOpComboBox(bool limitToLayerStyles, QWidget* parent = 0);
     ~KisCompositeOpComboBox() override;
 
+    void showPopup() override;
     void hidePopup() override;
 
     void validate(const KoColorSpace *cs);
     void selectCompositeOp(const KoID &op);
     KoID selectedCompositeOp() const;
 
+    /**
+     * Enables the preview/confirmation protocol used by the Layers docker.
+     * Other users of this widget keep the standard QComboBox behaviour.
+     */
+    void setPreviewEnabled(bool value);
+    bool previewEnabled() const;
+    bool previewActive() const;
+    bool previewCommitInProgress() const;
+
     void connectBlendmodeActions(KisActionManager *manager);
 
     void wheelEvent(QWheelEvent *e) override;
     void keyPressEvent(QKeyEvent *e) override;
 
+Q_SIGNALS:
+    void sigPreviewPopupOpened();
+    void sigPreviewRequested(const QString &compositeOpId);
+    void sigPreviewConfirmed(const QString &compositeOpId);
+    void sigPreviewCancelled();
+
 private Q_SLOTS:
     void slotCategoryToggled(const QModelIndex& index, bool toggled);
     void slotEntryChecked(const QModelIndex& index);
+    void slotPreviewIndex(const QModelIndex &index);
+    void slotPreviewIndexActivated(const QModelIndex &index);
 
     void slotNextBlendingMode();
     void slotPreviousBlendingMode();
@@ -91,11 +109,19 @@ private Q_SLOTS:
 
 private:
     void selectNeighbouringBlendMode(bool down);
+    bool isPreviewableIndex(const QModelIndex &index) const;
+    void requestPreview(const QModelIndex &index);
+    void confirmPreview(const QModelIndex &index);
+    void cancelPreview();
 
 private:
     KisSortedCompositeOpListModel *m_model;
     KisCategorizedListView *m_view;
     bool m_allowToHidePopup;
+    bool m_previewEnabled {false};
+    bool m_previewActive {false};
+    bool m_previewCommitInProgress {false};
+    QModelIndex m_previewIndex;
 };
 
 class KRITAUI_EXPORT KisLayerStyleCompositeOpComboBox: public KisCompositeOpComboBox
