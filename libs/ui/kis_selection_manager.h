@@ -96,7 +96,8 @@ public Q_SLOTS:
     void configChanged();
     
     void copySelectionToNewLayer();
-    void toggleDisplaySelection();
+    void toggleDisplaySelection(bool value);
+    void toggleAutomaticallyHideSelection(bool value);
 
     void shapeSelectionChanged();
     void imageResizeToSelection();
@@ -162,6 +163,7 @@ private:
     KisAction *m_imageResizeToSelection {0};
     KisAction *m_strokeShapes {0};
     KisAction *m_toggleDisplaySelection {0};
+    KisAction *m_toggleAutomaticallyHideSelection {0};
     KisAction *m_toggleSelectionOverlayMode {0};
     KisAction *m_strokeSelected {0};
     KisAction *m_enableSelectionActionsPanel {0};

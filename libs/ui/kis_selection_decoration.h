@@ -35,6 +35,8 @@ public:
     Mode mode() const;
     void setMode(Mode mode);
     void setVisible(bool v) override;
+    void setDisplaySelection(bool value);
+    void setAutomaticallyHideSelection(bool value);
 
     void notifyWindowMinimized(bool minimized) override;
     void setCanvasWidget(KisCanvasWidgetBase* canvas) override;
@@ -53,8 +55,10 @@ private Q_SLOTS:
 public Q_SLOTS:
     void selectionChanged();
     void antsAttackEvent();
+    void setSelectionToolActive(const QString &toolId);
 private:
     bool selectionIsActive();
+    void updateSelectionVisibility();
 
 private:
 
@@ -76,6 +80,9 @@ private:
     KisSelectionActionsPanel *m_selectionActionsPanel;
 
     bool m_selectionVisibility;
+    bool m_displaySelection {true};
+    bool m_automaticallyHideSelection {false};
+    bool m_selectionToolActive {false};
 };
 
 #endif

@@ -34,6 +34,7 @@
 #include <KoColorSpace.h>
 #include <KoCompositeOp.h>
 #include <KoToolProxy.h>
+#include <KoToolManager.h>
 #include <KoSvgPaste.h>
 #include <kis_icon.h>
 
@@ -168,8 +169,13 @@ void KisSelectionManager::setup(KisActionManager* actionManager)
     connect(m_strokeShapes, SIGNAL(triggered()), this, SLOT(paintSelectedShapes()));
 
     m_toggleDisplaySelection  = actionManager->createAction("toggle_display_selection");
-    connect(m_toggleDisplaySelection, SIGNAL(triggered()), this, SLOT(toggleDisplaySelection()));
+    connect(m_toggleDisplaySelection, SIGNAL(triggered(bool)), this, SLOT(toggleDisplaySelection(bool)));
     m_toggleDisplaySelection->setChecked(true);
+
+    m_toggleAutomaticallyHideSelection = actionManager->createAction("automatically_hide_selection");
+    connect(m_toggleAutomaticallyHideSelection, SIGNAL(triggered(bool)), this, SLOT(toggleAutomaticallyHideSelection(bool)));
+    m_toggleAutomaticallyHideSelection->setCheckable(true);
+    m_toggleAutomaticallyHideSelection->setChecked(KisConfig(true).automaticallyHideSelection());
 
     m_imageResizeToSelection  = actionManager->createAction("resizeimagetoselection");
     connect(m_imageResizeToSelection, SIGNAL(triggered()), this, SLOT(imageResizeToSelection()));
@@ -236,6 +242,9 @@ void KisSelectionManager::setView(QPointer<KisView>imageView)
             m_imageView->canvasBase()->addDecoration(decoration);
         }
         m_selectionDecoration = decoration;
+        decoration->setDisplaySelection(m_toggleDisplaySelection->isChecked());
+        decoration->setAutomaticallyHideSelection(m_toggleAutomaticallyHideSelection->isChecked());
+        decoration->setSelectionToolActive(KoToolManager::instance()->activeToolId());
         connect(this, SIGNAL(currentSelectionChanged()), decoration, SLOT(selectionChanged()));
         connect(m_imageView->image()->undoAdapter(), SIGNAL(selectionChanged()), SLOT(selectionChanged()));
         connect(m_imageView->canvasBase()->toolProxy(), SIGNAL(toolChanged(QString)), SLOT(clipboardDataChanged()));
@@ -445,7 +454,6 @@ void KisSelectionManager::reselect()
 }
 
 
-#include <KoToolManager.h>
 #include <KoInteractionTool.h>
 
 void KisSelectionManager::editSelection()
@@ -583,16 +591,22 @@ void KisSelectionManager::cutToNewLayer()
     factory.run(KisPasteActionFactory::ForceNewLayer, m_view);
 }
 
-void KisSelectionManager::toggleDisplaySelection()
+void KisSelectionManager::toggleDisplaySelection(bool value)
 {
     KIS_ASSERT_RECOVER_RETURN(m_selectionDecoration);
 
-    m_selectionDecoration->toggleSlectionVisibility();
-    m_toggleDisplaySelection->blockSignals(true);
-    m_toggleDisplaySelection->setChecked(m_selectionDecoration->visible());
-    m_toggleDisplaySelection->blockSignals(false);
+    m_selectionDecoration->setDisplaySelection(value);
 
     Q_EMIT displaySelectionChanged();
+}
+
+void KisSelectionManager::toggleAutomaticallyHideSelection(bool value)
+{
+    KisConfig(false).setAutomaticallyHideSelection(value);
+
+    if (m_selectionDecoration) {
+        m_selectionDecoration->setAutomaticallyHideSelection(value);
+    }
 }
 
 bool KisSelectionManager::displaySelection()

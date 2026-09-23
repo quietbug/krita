@@ -337,6 +337,7 @@ xsi:schemaLocation="http://www.kde.org/standards/kxmlgui/1.0  http://www.kde.org
       <Action name="similar"/>
       <Separator/>
       <Action name="toggle_display_selection"/>
+      <Action name="automatically_hide_selection"/>
       <Action name="show-global-selection-mask"/>
       <Action name="selectionscale"/>
       <Separator/>

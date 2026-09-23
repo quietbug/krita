@@ -1425,6 +1425,16 @@ void KisConfig::setShowGlobalSelection(bool showGlobalSelection) const
     m_cfg.writeEntry("ShowGlobalSelection", showGlobalSelection);
 }
 
+bool KisConfig::automaticallyHideSelection(bool defaultValue) const
+{
+    return (defaultValue ? false : m_cfg.readEntry("AutomaticallyHideSelection", false));
+}
+
+void KisConfig::setAutomaticallyHideSelection(bool value) const
+{
+    m_cfg.writeEntry("AutomaticallyHideSelection", value);
+}
+
 // brush outline settings
 
 bool KisConfig::showOutlineWhilePainting(bool defaultValue) const

@@ -354,6 +354,9 @@ public:
     bool showGlobalSelection(bool defaultValue = false) const;
     void setShowGlobalSelection(bool showGlobalSelection) const;
 
+    bool automaticallyHideSelection(bool defaultValue = false) const;
+    void setAutomaticallyHideSelection(bool value) const;
+
     bool showOutlineWhilePainting(bool defaultValue = false) const;
     void setShowOutlineWhilePainting(bool showOutlineWhilePainting) const;
 

@@ -13,6 +13,7 @@
 #include <QMainWindow>
 #include <QWindow>
 #include <QScreen>
+#include <QStringList>
 
 #include <kis_debug.h>
 #include <klocalizedstring.h>
@@ -27,6 +28,7 @@
 #include "kis_update_outline_job.h"
 #include "kis_selection_manager.h"
 #include "canvas/kis_canvas2.h"
+#include <KoToolProxy.h>
 #include "kis_canvas_resource_provider.h"
 #include "kis_coordinates_converter.h"
 #include "kis_config.h"
@@ -51,6 +53,7 @@ KisSelectionDecoration::KisSelectionDecoration(QPointer<KisView>_view)
 {
     initializePens();
     connect(this->view()->canvasBase()->resourceManager(), SIGNAL(canvasResourceChanged(int, const QVariant&)), this, SLOT(slotCanvasResourcesChanged(int, const QVariant&)));
+    connect(this->view()->canvasBase()->toolProxy(), SIGNAL(toolChanged(QString)), this, SLOT(setSelectionToolActive(QString)));
 
     connect(KisConfigNotifier::instance(), SIGNAL(configChanged()), SLOT(slotConfigChanged()));
     connect(KisImageConfigNotifier::instance(), SIGNAL(configChanged()), SLOT(slotConfigChanged()));
@@ -195,7 +198,46 @@ void KisSelectionDecoration::antsAttackEvent()
 }
 
 void KisSelectionDecoration::toggleSlectionVisibility() {
-    m_selectionVisibility = !m_selectionVisibility;
+    setDisplaySelection(!m_displaySelection);
+}
+
+void KisSelectionDecoration::setDisplaySelection(bool value)
+{
+    m_displaySelection = value;
+    updateSelectionVisibility();
+}
+
+void KisSelectionDecoration::setAutomaticallyHideSelection(bool value)
+{
+    m_automaticallyHideSelection = value;
+    updateSelectionVisibility();
+}
+
+void KisSelectionDecoration::setSelectionToolActive(const QString &toolId)
+{
+    static const QStringList selectionToolIds = {
+        QStringLiteral("KisToolSelectOutline"),
+        QStringLiteral("KisToolSelectPolygonal"),
+        QStringLiteral("KisToolSelectRectangular"),
+        QStringLiteral("KisToolSelectElliptical"),
+        QStringLiteral("KisToolSelectContiguous"),
+        QStringLiteral("KisToolSelectPath"),
+        QStringLiteral("KisToolSelectSimilar"),
+        QStringLiteral("KisToolSelectMagnetic")
+    };
+
+    m_selectionToolActive = selectionToolIds.contains(toolId);
+    updateSelectionVisibility();
+}
+
+void KisSelectionDecoration::updateSelectionVisibility()
+{
+    const bool visible = m_displaySelection &&
+        (!m_automaticallyHideSelection || m_selectionToolActive);
+
+    m_selectionVisibility = visible;
+    KisCanvasDecoration::setVisible(visible);
+    selectionChanged();
 }
 
 void KisSelectionDecoration::drawDecoration(QPainter& gc, const QRectF& updateRect, const KisCoordinatesConverter *converter, KisCanvas2 *canvas)
@@ -267,9 +309,7 @@ void KisSelectionDecoration::setCanvasWidget(KisCanvasWidgetBase* canvas)
 
 void KisSelectionDecoration::setVisible(bool v)
 {
-    m_selectionVisibility = v;
-    KisCanvasDecoration::setVisible(v);
-    selectionChanged();
+    setDisplaySelection(v);
     m_selectionActionsPanel->setVisible(v);
 }
 

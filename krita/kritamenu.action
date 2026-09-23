@@ -1508,6 +1508,18 @@
       <isCheckable>true</isCheckable>
       <statusTip></statusTip>
     </Action>
+    <Action name="automatically_hide_selection">
+      <icon></icon>
+      <text>Automatically hide selection when drawing</text>
+      <whatsThis></whatsThis>
+      <toolTip>Automatically hide selection when drawing</toolTip>
+      <iconText>Automatically hide selection when drawing</iconText>
+      <activationFlags>1000</activationFlags>
+      <activationConditions>0</activationConditions>
+      <shortcut></shortcut>
+      <isCheckable>true</isCheckable>
+      <statusTip></statusTip>
+    </Action>
     <Action name="selectionscale">
       <icon></icon>
       <text>Sca&amp;le...</text>
